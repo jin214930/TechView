@@ -1,4 +1,6 @@
-@ApplicationModule
+@ApplicationModule(
+        type = ApplicationModule.Type.OPEN
+)
 
 package com.ward.techview.common;
 
