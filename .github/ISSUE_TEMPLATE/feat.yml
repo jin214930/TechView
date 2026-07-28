@@ -1,0 +1,54 @@
+name: Feat
+description: 사용자 가치 또는 제품 기능을 추가할 때 사용합니다.
+title: "[Feat] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        구현 전 관련 Notion 설계 문서와 선행 Issue를 확인합니다.
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목표
+      description: 이 기능이 해결하는 문제와 기대 결과를 작성합니다.
+      placeholder: 예) 회원이 이메일과 비밀번호로 가입할 수 있다.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 작업 범위
+      description: 구현 대상과 제외 대상을 구분해 작성합니다.
+      placeholder: |
+        - 포함:
+        - 제외:
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: 완료 조건
+      description: 검증 가능한 조건을 체크리스트로 작성합니다.
+      placeholder: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: 관련 문서 및 Issue
+      description: Notion, Figma, API 명세, 선행/후속 Issue 링크를 작성합니다.
+      placeholder: |
+        - Notion:
+        - Figma:
+        - Related:
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 시작 전 확인
+      options:
+        - label: 범위와 완료 조건을 확인했습니다.
+          required: true
+        - label: 관련 설계 문서를 확인했습니다.
+          required: true

@@ -1,0 +1,50 @@
+name: Refactor
+description: 동작을 유지하면서 구조·가독성·유지보수성을 개선할 때 사용합니다.
+title: "[Refactor] "
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: 개선 배경
+      description: 현재 구조의 문제와 개선이 필요한 이유를 작성합니다.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 변경 범위
+      description: 변경 대상과 의도적으로 건드리지 않는 대상을 구분합니다.
+      placeholder: |
+        - 변경:
+        - 제외:
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: 개선 방향
+      description: 주요 구조 변경과 호환성 유지 방안을 작성합니다.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: 영향 및 위험
+      description: 회귀 위험, 데이터/API 호환성, 필요한 검증을 작성합니다.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: 완료 조건
+      description: 동작 보존을 포함한 검증 조건을 체크리스트로 작성합니다.
+      placeholder: |
+        - [ ] 기존 동작이 유지된다.
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: 관련 문서 및 Issue
+      description: 관련 설계·선행/후속 Issue 링크를 작성합니다.
