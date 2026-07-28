@@ -64,6 +64,10 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # lockfile을 생성한 npm 버전과 CI 버전을 맞춰 플랫폼별 의존성 해석 차이를 방지합니다.
+      - name: Set up npm 11.12.1
+        run: npm install --global npm@11.12.1
+
       # lockfile과 정확히 일치하게 설치하며, audit는 별도 Issue에서 관리합니다.
       - name: Install frontend dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
