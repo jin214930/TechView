@@ -1,0 +1,6 @@
+logging:
+  level:
+    root: INFO
+    com.ward.techview: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
