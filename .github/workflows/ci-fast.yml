@@ -40,7 +40,7 @@ jobs:
       - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
 
-      # test가 컴파일, 단위 테스트, Spring Context, Modulith 경계 검증을 수행합니다.
+      # test가 컴파일, 단위 테스트와 Modulith 경계 검증만 수행하며 DB와 Docker는 사용하지 않습니다.
       - name: Run backend fast tests
         run: bash gradlew --no-daemon --console=plain test
 
