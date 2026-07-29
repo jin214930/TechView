@@ -2,6 +2,7 @@ package com.ward.techview.common.exception;
 
 import com.ward.techview.common.response.ApiResponse;
 import com.ward.techview.common.response.CommonResponseCode;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindingResult;
@@ -69,7 +70,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ApiResponse<Void> handle(HttpRequestMethodNotSupportedException e) {
+    public ApiResponse<Void> handle(
+            HttpRequestMethodNotSupportedException e,
+            HttpServletResponse response
+    ) {
+        e.getHeaders().forEach((name, values) ->
+                values.forEach(value -> response.addHeader(name, value))
+        );
+
         log.warn("Method Not Allowed: {}", e.getMessage());
         return ApiResponse.from(CommonResponseCode.METHOD_NOT_ALLOWED);
     }
