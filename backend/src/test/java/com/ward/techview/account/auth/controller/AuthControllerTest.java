@@ -4,12 +4,15 @@ import com.ward.techview.account.auth.dto.LoginRequest;
 import com.ward.techview.account.auth.dto.LoginResponse;
 import com.ward.techview.account.auth.dto.LoginResult;
 import com.ward.techview.account.auth.dto.SignUpRequest;
+import com.ward.techview.account.auth.dto.TokenReissueResult;
+import com.ward.techview.account.auth.dto.TokenResponse;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.auth.service.AuthService;
 import com.ward.techview.account.auth.cookie.RefreshTokenCookieManager;
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.common.exception.GlobalExceptionHandler;
 import com.ward.techview.common.response.ApiResponseAdvice;
+import com.ward.techview.common.response.CommonResponseCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -265,5 +268,68 @@ class AuthControllerTest {
 
         verify(authService).logout(null);
         verify(refreshTokenCookieManager).expire();
+    }
+
+    @Test
+    @DisplayName("토큰 재발급에 성공하면 새 Access Token과 Refresh Token 쿠키를 반환한다")
+    void shouldReturnNewTokensWhenRefreshSucceeds() throws Exception {
+        TokenReissueResult result = new TokenReissueResult(
+                "new-refresh-token",
+                new TokenResponse("new-access-token")
+        );
+        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", "new-refresh-token")
+                .httpOnly(true)
+                .path("/api/v1/auth")
+                .maxAge(2_592_000)
+                .build();
+        when(authService.reissueTokens("refresh-token")).thenReturn(result);
+        when(refreshTokenCookieManager.create("new-refresh-token")).thenReturn(refreshTokenCookie);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refreshToken", "refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        allOf(
+                                containsString("refreshToken=new-refresh-token"),
+                                containsString("Path=/api/v1/auth"),
+                                containsString("Max-Age=2592000"),
+                                containsString("HttpOnly")
+                        )
+                ))
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("요청에 성공했습니다."))
+                .andExpect(jsonPath("$.data.accessToken").value("new-access-token"));
+
+        verify(authService).reissueTokens("refresh-token");
+        verify(refreshTokenCookieManager).create("new-refresh-token");
+    }
+
+    @Test
+    @DisplayName("Refresh Token 쿠키가 없으면 HTTP 401을 반환한다")
+    void shouldReturnUnauthorizedWhenRefreshTokenCookieIsMissing() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1002))
+                .andExpect(jsonPath("$.message").value("인증이 필요합니다."));
+
+        verify(authService, never()).reissueTokens(any());
+        verify(refreshTokenCookieManager, never()).create(any());
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 Refresh Token이면 HTTP 401을 반환하고 쿠키를 발급하지 않는다")
+    void shouldReturnUnauthorizedWhenRefreshTokenIsInvalid() throws Exception {
+        doThrow(new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED))
+                .when(authService)
+                .reissueTokens("invalid-token");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refreshToken", "invalid-token")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(1002))
+                .andExpect(jsonPath("$.message").value("인증이 필요합니다."));
+
+        verify(refreshTokenCookieManager, never()).create(any());
     }
 }

@@ -3,10 +3,14 @@ package com.ward.techview.account.auth.service;
 import com.ward.techview.account.auth.dto.LoginRequest;
 import com.ward.techview.account.auth.dto.LoginResult;
 import com.ward.techview.account.auth.dto.SignUpRequest;
+import com.ward.techview.account.auth.dto.TokenReissueResult;
+import com.ward.techview.account.auth.entity.RefreshToken;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.member.entity.Member;
 import com.ward.techview.account.member.repository.MemberRepository;
 import com.ward.techview.common.exception.BusinessException;
+import com.ward.techview.common.response.CommonResponseCode;
+import com.ward.techview.common.security.CustomUserDetails;
 import com.ward.techview.common.security.IssuedToken;
 import com.ward.techview.common.security.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
@@ -169,6 +173,64 @@ class AuthServiceTest {
         verify(refreshTokenService).revoke("refresh-token");
     }
 
+    @Test
+    @DisplayName("유효한 Refresh Token이면 Access Token과 회전된 Refresh Token을 반환한다")
+    void shouldReissueAndRotateTokensWhenRefreshTokenIsValid() {
+        Member member = member(1L);
+        RefreshToken storedToken = RefreshToken.create("refresh-token", 1L, future());
+        CustomUserDetails principal = new CustomUserDetails(1L, "user@example.com");
+        IssuedToken accessToken = accessToken();
+        IssuedToken newRefreshToken = reissuedRefreshToken();
+        when(jwtProvider.getRefreshTokenPrincipal("refresh-token")).thenReturn(principal);
+        when(refreshTokenService.getActiveToken("refresh-token", 1L)).thenReturn(storedToken);
+        when(memberRepository.findById(1L)).thenReturn(Optional.of(member));
+        when(jwtProvider.generateAccessToken(1L, "user@example.com")).thenReturn(accessToken);
+        when(jwtProvider.generateRefreshToken(1L, "user@example.com")).thenReturn(newRefreshToken);
+
+        TokenReissueResult result = authService.reissueTokens("refresh-token");
+
+        assertAll(
+                () -> assertEquals("new-refresh-token", result.refreshToken()),
+                () -> assertEquals("access-token", result.tokenResponse().accessToken())
+        );
+        verify(refreshTokenService).rotate(storedToken, newRefreshToken);
+    }
+
+    @Test
+    @DisplayName("Refresh Token의 JWT 검증에 실패하면 인증 필요 예외를 발생시킨다")
+    void shouldThrowAuthenticationRequiredWhenRefreshTokenPrincipalIsInvalid() {
+        when(jwtProvider.getRefreshTokenPrincipal("invalid-token")).thenReturn(null);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> authService.reissueTokens("invalid-token")
+        );
+
+        assertSame(CommonResponseCode.AUTHENTICATION_REQUIRED, exception.getResponseCode());
+        verify(refreshTokenService, never()).getActiveToken(any(), any());
+        verify(memberRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("Refresh Token의 회원이 존재하지 않으면 인증 필요 예외를 발생시킨다")
+    void shouldThrowAuthenticationRequiredWhenRefreshTokenMemberDoesNotExist() {
+        CustomUserDetails principal = new CustomUserDetails(1L, "user@example.com");
+        RefreshToken storedToken = RefreshToken.create("refresh-token", 1L, future());
+        when(jwtProvider.getRefreshTokenPrincipal("refresh-token")).thenReturn(principal);
+        when(refreshTokenService.getActiveToken("refresh-token", 1L)).thenReturn(storedToken);
+        when(memberRepository.findById(1L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> authService.reissueTokens("refresh-token")
+        );
+
+        assertSame(CommonResponseCode.AUTHENTICATION_REQUIRED, exception.getResponseCode());
+        verify(jwtProvider, never()).generateAccessToken(any(), any());
+        verify(jwtProvider, never()).generateRefreshToken(any(), any());
+        verify(refreshTokenService, never()).rotate(any(), any());
+    }
+
     private static Member member(Long id) {
         Member member = Member.create("user@example.com", "encoded-password", "사용자");
         ReflectionTestUtils.setField(member, "id", id);
@@ -187,5 +249,16 @@ class AuthServiceTest {
                 "refresh-token",
                 OffsetDateTime.of(2026, 8, 28, 13, 0, 0, 0, ZoneOffset.UTC)
         );
+    }
+
+    private static IssuedToken reissuedRefreshToken() {
+        return new IssuedToken(
+                "new-refresh-token",
+                OffsetDateTime.of(2026, 8, 28, 13, 30, 0, 0, ZoneOffset.UTC)
+        );
+    }
+
+    private static OffsetDateTime future() {
+        return OffsetDateTime.now(ZoneOffset.UTC).plusDays(1);
     }
 }
