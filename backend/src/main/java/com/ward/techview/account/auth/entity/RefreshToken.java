@@ -19,7 +19,7 @@ import java.time.OffsetDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RefreshToken extends BaseEntity {
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 512)
     private String token;
 
     @Column(nullable = false)
@@ -38,5 +38,19 @@ public class RefreshToken extends BaseEntity {
 
     public static RefreshToken create(String token, Long memberId, OffsetDateTime expiresAt) {
         return new RefreshToken(token, memberId, expiresAt);
+    }
+
+    public void rotate(String token, OffsetDateTime expiresAt) {
+        this.token = token;
+        this.expiresAt = expiresAt;
+        this.revokedAt = null;
+    }
+
+    public void revoke(OffsetDateTime revokedAt) {
+        this.revokedAt = revokedAt;
+    }
+
+    public boolean isActive(OffsetDateTime now) {
+        return revokedAt == null && expiresAt.isAfter(now);
     }
 }

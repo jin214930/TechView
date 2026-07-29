@@ -17,3 +17,9 @@ logging:
     root: INFO
     com.ward.techview: INFO
     org.hibernate.SQL: OFF
+
+custom:
+  cookie:
+    token:
+      secure: true
+      same-site: lax

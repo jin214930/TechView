@@ -11,7 +11,10 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 public class JwtProvider {
@@ -48,11 +51,11 @@ public class JwtProvider {
         this.refreshTokenExpirationTime = refreshTokenExpirationTime;
     }
 
-    public String generateAccessToken(Long memberId, String email) {
+    public IssuedToken generateAccessToken(Long memberId, String email) {
         return generateToken(memberId, email, ACCESS_TOKEN, accessTokenExpirationTime);
     }
 
-    public String generateRefreshToken(Long memberId, String email) {
+    public IssuedToken generateRefreshToken(Long memberId, String email) {
         return generateToken(memberId, email, REFRESH_TOKEN, refreshTokenExpirationTime);
     }
 
@@ -64,7 +67,7 @@ public class JwtProvider {
         return getTokenPrincipal(token, REFRESH_TOKEN);
     }
 
-    private String generateToken(
+    private IssuedToken generateToken(
             Long memberId,
             String email,
             String tokenType,
@@ -78,7 +81,8 @@ public class JwtProvider {
         Instant now = Instant.now();
         Instant expiration = now.plus(expirationTime);
 
-        return Jwts.builder()
+        String token = Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .issuer(issuer)
                 .subject(email)
                 .claim(MEMBER_ID, memberId)
@@ -87,6 +91,9 @@ public class JwtProvider {
                 .expiration(Date.from(expiration))
                 .signWith(secretKey, Jwts.SIG.HS256)
                 .compact();
+
+        OffsetDateTime expiresAt = OffsetDateTime.ofInstant(expiration, ZoneOffset.UTC);
+        return new IssuedToken(token, expiresAt);
     }
 
     private CustomUserDetails getTokenPrincipal(String token, String expectedTokenType) {

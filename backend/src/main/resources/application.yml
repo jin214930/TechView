@@ -14,6 +14,8 @@ spring:
         default_batch_fetch_size: 100
 
 custom:
+  cors:
+    allowed-origin: ${CORS_ALLOWED_ORIGIN}
   jwt:
     issuer: techView
     secret-key: ${JWT_SECRET_KEY}
@@ -21,3 +23,7 @@ custom:
       expiration-time: ${JWT_ACCESS_TOKEN_EXPIRATION_TIME}
     refresh-token:
       expiration-time: ${JWT_REFRESH_TOKEN_EXPIRATION_TIME}
+  cookie:
+    token:
+      http-only: true
+      path: "/api/v1/auth"

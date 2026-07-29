@@ -16,6 +16,7 @@ import java.util.Date;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -35,9 +36,9 @@ class JwtProviderTest {
     @Test
     @DisplayName("Access Token은 HS256과 필수 Claims 및 설정된 만료 시간을 포함한다")
     void shouldGenerateAccessTokenWithExpectedHeaderAndClaims() {
-        String token = jwtProvider.generateAccessToken(MEMBER_ID, EMAIL);
+        IssuedToken issuedToken = jwtProvider.generateAccessToken(MEMBER_ID, EMAIL);
 
-        Jws<Claims> parsedToken = parse(token, ISSUER, secretKey);
+        Jws<Claims> parsedToken = parse(issuedToken.value(), ISSUER, secretKey);
         Claims claims = parsedToken.getPayload();
 
         assertAll(
@@ -54,6 +55,10 @@ class JwtProviderTest {
                                 claims.getIssuedAt().toInstant(),
                                 claims.getExpiration().toInstant()
                         )
+                ),
+                () -> assertEquals(
+                        claims.getExpiration().toInstant().getEpochSecond(),
+                        issuedToken.expiresAt().toInstant().getEpochSecond()
                 )
         );
     }
@@ -61,7 +66,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("Access Token을 파싱하면 회원 principal을 반환한다")
     void shouldReturnPrincipalFromAccessToken() {
-        String token = jwtProvider.generateAccessToken(MEMBER_ID, EMAIL);
+        String token = jwtProvider.generateAccessToken(MEMBER_ID, EMAIL).value();
 
         CustomUserDetails principal = jwtProvider.getAccessTokenPrincipal(token);
 
@@ -73,7 +78,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("Refresh Token을 파싱하면 회원 principal을 반환한다")
     void shouldReturnPrincipalFromRefreshToken() {
-        String token = jwtProvider.generateRefreshToken(MEMBER_ID, EMAIL);
+        String token = jwtProvider.generateRefreshToken(MEMBER_ID, EMAIL).value();
 
         CustomUserDetails principal = jwtProvider.getRefreshTokenPrincipal(token);
 
@@ -83,10 +88,27 @@ class JwtProviderTest {
     }
 
     @Test
+    @DisplayName("같은 회원에게 연속 발급한 Refresh Token은 서로 다른 jti와 토큰 값을 가진다")
+    void shouldGenerateRefreshTokensWithUniqueIdentifiers() {
+        IssuedToken firstToken = jwtProvider.generateRefreshToken(MEMBER_ID, EMAIL);
+        IssuedToken secondToken = jwtProvider.generateRefreshToken(MEMBER_ID, EMAIL);
+
+        String firstTokenId = parse(firstToken.value(), ISSUER, secretKey).getPayload().getId();
+        String secondTokenId = parse(secondToken.value(), ISSUER, secretKey).getPayload().getId();
+
+        assertAll(
+                () -> assertNotNull(firstTokenId),
+                () -> assertNotNull(secondTokenId),
+                () -> assertNotEquals(firstTokenId, secondTokenId),
+                () -> assertNotEquals(firstToken.value(), secondToken.value())
+        );
+    }
+
+    @Test
     @DisplayName("Access Token과 Refresh Token은 반대 타입 principal로 사용할 수 없다")
     void shouldRejectTokenWhenTokenTypeDoesNotMatch() {
-        String accessToken = jwtProvider.generateAccessToken(MEMBER_ID, EMAIL);
-        String refreshToken = jwtProvider.generateRefreshToken(MEMBER_ID, EMAIL);
+        String accessToken = jwtProvider.generateAccessToken(MEMBER_ID, EMAIL).value();
+        String refreshToken = jwtProvider.generateRefreshToken(MEMBER_ID, EMAIL).value();
 
         assertNull(jwtProvider.getRefreshTokenPrincipal(accessToken));
         assertNull(jwtProvider.getAccessTokenPrincipal(refreshToken));
