@@ -6,7 +6,7 @@ import com.ward.techview.account.auth.dto.LoginResult;
 import com.ward.techview.account.auth.dto.SignUpRequest;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.auth.service.AuthService;
-import com.ward.techview.account.auth.util.TokenCookieManager;
+import com.ward.techview.account.auth.cookie.RefreshTokenCookieManager;
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.common.exception.GlobalExceptionHandler;
 import com.ward.techview.common.response.ApiResponseAdvice;
@@ -22,6 +22,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.test.web.servlet.MockMvc;
 
 import jakarta.servlet.http.Cookie;
+
 import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.Matchers.allOf;
@@ -44,13 +45,13 @@ class AuthControllerTest {
     private AuthService authService;
 
     @Mock
-    private TokenCookieManager tokenCookieManager;
+    private RefreshTokenCookieManager refreshTokenCookieManager;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = standaloneSetup(new AuthController(authService, tokenCookieManager))
+        mockMvc = standaloneSetup(new AuthController(authService, refreshTokenCookieManager))
                 .setControllerAdvice(new GlobalExceptionHandler(), new ApiResponseAdvice())
                 .build();
     }
@@ -138,7 +139,7 @@ class AuthControllerTest {
                 .build();
 
         when(authService.login(request, "existing-refresh-token")).thenReturn(result);
-        when(tokenCookieManager.create("new-refresh-token")).thenReturn(refreshTokenCookie);
+        when(refreshTokenCookieManager.create("new-refresh-token")).thenReturn(refreshTokenCookie);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .cookie(new Cookie("refreshToken", "existing-refresh-token"))
@@ -168,7 +169,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.nickname").value("사용자"));
 
         verify(authService).login(request, "existing-refresh-token");
-        verify(tokenCookieManager).create("new-refresh-token");
+        verify(refreshTokenCookieManager).create("new-refresh-token");
     }
 
     @Test
@@ -210,7 +211,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value(2001))
                 .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 일치하지 않습니다."));
 
-        verify(tokenCookieManager, never()).create(any());
+        verify(refreshTokenCookieManager, never()).create(any());
     }
 
     @Test
@@ -221,7 +222,7 @@ class AuthControllerTest {
                 .path("/api/v1/auth")
                 .maxAge(0)
                 .build();
-        when(tokenCookieManager.expire()).thenReturn(expiredCookie);
+        when(refreshTokenCookieManager.expire()).thenReturn(expiredCookie);
 
         mockMvc.perform(post("/api/v1/auth/logout")
                         .cookie(new Cookie("refreshToken", "refresh-token")))
@@ -240,7 +241,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data").doesNotExist());
 
         verify(authService).logout("refresh-token");
-        verify(tokenCookieManager).expire();
+        verify(refreshTokenCookieManager).expire();
     }
 
     @Test
@@ -251,7 +252,7 @@ class AuthControllerTest {
                 .path("/api/v1/auth")
                 .maxAge(0)
                 .build();
-        when(tokenCookieManager.expire()).thenReturn(expiredCookie);
+        when(refreshTokenCookieManager.expire()).thenReturn(expiredCookie);
 
         mockMvc.perform(post("/api/v1/auth/logout"))
                 .andExpect(status().isOk())
@@ -263,6 +264,6 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("로그아웃이 완료되었습니다."));
 
         verify(authService).logout(null);
-        verify(tokenCookieManager).expire();
+        verify(refreshTokenCookieManager).expire();
     }
 }

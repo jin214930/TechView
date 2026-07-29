@@ -1,13 +1,12 @@
 package com.ward.techview.account.auth.controller;
 
-import com.ward.techview.account.auth.dto.LoginRequest;
-import com.ward.techview.account.auth.dto.LoginResponse;
-import com.ward.techview.account.auth.dto.LoginResult;
-import com.ward.techview.account.auth.dto.SignUpRequest;
+import com.ward.techview.account.auth.dto.*;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.auth.service.AuthService;
-import com.ward.techview.account.auth.util.TokenCookieManager;
+import com.ward.techview.account.auth.cookie.RefreshTokenCookieManager;
+import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.common.response.ApiResponse;
+import com.ward.techview.common.response.CommonResponseCode;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
     private final AuthService authService;
-    private final TokenCookieManager tokenCookieManager;
+    private final RefreshTokenCookieManager refreshTokenCookieManager;
 
     @PostMapping("/signup")
     public ApiResponse<Void> signUp(@Valid @RequestBody SignUpRequest request) {
@@ -35,7 +34,7 @@ public class AuthController {
             HttpServletResponse response
     ) {
         LoginResult result = authService.login(request, existingRefreshToken);
-        response.addHeader(HttpHeaders.SET_COOKIE, tokenCookieManager.create(result.refreshToken()).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookieManager.create(result.refreshToken()).toString());
         return ApiResponse.from(AuthResponseCode.LOGIN_SUCCESS, result.loginResponse());
     }
 
@@ -45,7 +44,23 @@ public class AuthController {
             HttpServletResponse response
     ) {
         authService.logout(refreshToken);
-        response.addHeader(HttpHeaders.SET_COOKIE, tokenCookieManager.expire().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookieManager.expire().toString());
         return ApiResponse.from(AuthResponseCode.LOGOUT_SUCCESS);
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<TokenResponse> refresh(
+            @CookieValue(name = "refreshToken", required = false) String refreshToken,
+            HttpServletResponse response
+    ) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED);
+        }
+
+        TokenReissueResult result = authService.reissueTokens(refreshToken);
+
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookieManager.create(result.refreshToken()).toString());
+
+        return ApiResponse.from(CommonResponseCode.SUCCESS, result.tokenResponse());
     }
 }

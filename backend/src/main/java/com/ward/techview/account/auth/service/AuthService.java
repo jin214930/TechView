@@ -1,15 +1,14 @@
 package com.ward.techview.account.auth.service;
 
-import com.ward.techview.account.auth.dto.LoginRequest;
-import com.ward.techview.account.auth.dto.LoginResponse;
-import com.ward.techview.account.auth.dto.LoginResult;
-import com.ward.techview.account.auth.dto.SignUpRequest;
+import com.ward.techview.account.auth.dto.*;
 import com.ward.techview.account.auth.entity.RefreshToken;
 import com.ward.techview.account.auth.repository.RefreshTokenRepository;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.member.entity.Member;
 import com.ward.techview.account.member.repository.MemberRepository;
 import com.ward.techview.common.exception.BusinessException;
+import com.ward.techview.common.response.CommonResponseCode;
+import com.ward.techview.common.security.CustomUserDetails;
 import com.ward.techview.common.security.IssuedToken;
 import com.ward.techview.common.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
@@ -75,6 +74,35 @@ public class AuthService {
 
         refreshTokenRepository.findByToken(refreshToken)
                 .ifPresent(token -> token.revoke(OffsetDateTime.now(ZoneOffset.UTC)));
+    }
+
+    @Transactional
+    public TokenReissueResult reissueTokens(String refreshToken) {
+        CustomUserDetails principal = jwtProvider.getRefreshTokenPrincipal(refreshToken);
+        if (principal == null) {
+            throw new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED);
+        }
+
+        RefreshToken refreshTokenEntity = refreshTokenRepository.findByToken(refreshToken)
+                .orElseThrow(() -> new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED));
+
+        if (!refreshTokenEntity.isActive(OffsetDateTime.now(ZoneOffset.UTC))) {
+            throw new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED);
+        }
+
+        if (!refreshTokenEntity.getMemberId().equals(principal.id())) {
+            throw new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED);
+        }
+
+        Member member = memberRepository.findById(principal.id())
+                .orElseThrow(() -> new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED));
+
+        IssuedToken accessToken = jwtProvider.generateAccessToken(member.getId(), member.getEmail());
+        IssuedToken newRefreshToken = jwtProvider.generateRefreshToken(member.getId(), member.getEmail());
+
+        refreshTokenEntity.rotate(newRefreshToken.value(), newRefreshToken.expiresAt());
+
+        return new TokenReissueResult(newRefreshToken.value(), new TokenResponse(accessToken.value()));
     }
 
     private String normalizeEmail(String email) {

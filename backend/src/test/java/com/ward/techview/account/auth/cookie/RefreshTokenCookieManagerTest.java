@@ -1,4 +1,4 @@
-package com.ward.techview.account.auth.util;
+package com.ward.techview.account.auth.cookie;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,30 +13,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class TokenCookieManagerTest {
+class RefreshTokenCookieManagerTest {
 
     private static final Duration REFRESH_TOKEN_EXPIRATION = Duration.ofDays(30);
 
-    private TokenCookieManager tokenCookieManager;
+    private RefreshTokenCookieManager refreshTokenCookieManager;
 
     @BeforeEach
     void setUp() {
-        tokenCookieManager = new TokenCookieManager();
+        refreshTokenCookieManager = new RefreshTokenCookieManager();
         ReflectionTestUtils.setField(
-                tokenCookieManager,
+                refreshTokenCookieManager,
                 "refreshTokenExpirationTime",
                 REFRESH_TOKEN_EXPIRATION
         );
-        ReflectionTestUtils.setField(tokenCookieManager, "httpOnly", true);
-        ReflectionTestUtils.setField(tokenCookieManager, "path", "/api/v1/auth");
-        ReflectionTestUtils.setField(tokenCookieManager, "secure", false);
-        ReflectionTestUtils.setField(tokenCookieManager, "sameSite", "lax");
+        ReflectionTestUtils.setField(refreshTokenCookieManager, "httpOnly", true);
+        ReflectionTestUtils.setField(refreshTokenCookieManager, "path", "/api/v1/auth");
+        ReflectionTestUtils.setField(refreshTokenCookieManager, "secure", false);
+        ReflectionTestUtils.setField(refreshTokenCookieManager, "sameSite", "lax");
     }
 
     @Test
     @DisplayName("Refresh Token 쿠키에 보안 속성과 만료 시간을 설정한다")
     void shouldCreateRefreshTokenCookieWithConfiguredAttributes() {
-        ResponseCookie cookie = tokenCookieManager.create("refresh-token");
+        ResponseCookie cookie = refreshTokenCookieManager.create("refresh-token");
 
         assertAll(
                 () -> assertEquals("refreshToken", cookie.getName()),
@@ -52,7 +52,7 @@ class TokenCookieManagerTest {
     @Test
     @DisplayName("Refresh Token 만료 쿠키는 동일한 속성과 0초의 Max-Age를 사용한다")
     void shouldCreateExpiredRefreshTokenCookie() {
-        ResponseCookie cookie = tokenCookieManager.expire();
+        ResponseCookie cookie = refreshTokenCookieManager.expire();
 
         assertAll(
                 () -> assertEquals("refreshToken", cookie.getName()),

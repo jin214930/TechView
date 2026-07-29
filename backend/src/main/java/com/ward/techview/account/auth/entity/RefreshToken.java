@@ -49,4 +49,8 @@ public class RefreshToken extends BaseEntity {
     public void revoke(OffsetDateTime revokedAt) {
         this.revokedAt = revokedAt;
     }
+
+    public boolean isActive(OffsetDateTime now) {
+        return revokedAt == null && expiresAt.isAfter(now);
+    }
 }

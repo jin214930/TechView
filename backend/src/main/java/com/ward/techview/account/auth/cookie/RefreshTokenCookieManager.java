@@ -1,4 +1,4 @@
-package com.ward.techview.account.auth.util;
+package com.ward.techview.account.auth.cookie;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 @Component
-public class TokenCookieManager {
+public class RefreshTokenCookieManager {
     @Value("${custom.jwt.refresh-token.expiration-time}")
     private Duration refreshTokenExpirationTime;
 
