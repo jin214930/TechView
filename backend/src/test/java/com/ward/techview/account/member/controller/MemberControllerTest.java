@@ -98,7 +98,7 @@ class MemberControllerTest {
 
         mockMvc.perform(get("/api/v1/members/me"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(2004))
+                .andExpect(jsonPath("$.code").value(2002))
                 .andExpect(jsonPath("$.message").value("회원을 찾을 수 없습니다."));
     }
 
@@ -141,7 +141,7 @@ class MemberControllerTest {
         mockMvc.perform(delete("/api/v1/members/me"))
                 .andExpect(status().isNotFound())
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
-                .andExpect(jsonPath("$.code").value(2004))
+                .andExpect(jsonPath("$.code").value(2002))
                 .andExpect(jsonPath("$.message").value("회원을 찾을 수 없습니다."));
 
         verify(refreshTokenCookieManager, never()).expire();

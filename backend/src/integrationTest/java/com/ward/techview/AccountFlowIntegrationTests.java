@@ -252,7 +252,7 @@ class AccountFlowIntegrationTests {
         mockMvc.perform(get("/api/v1/members/me")
                         .header(HttpHeaders.AUTHORIZATION, bearer(session.accessToken())))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(2004));
+                .andExpect(jsonPath("$.code").value(2002));
     }
 
     private org.springframework.test.web.servlet.ResultActions signUp(
