@@ -22,4 +22,4 @@ custom:
   cookie:
     token:
       secure: true
-      same-site: none
+      same-site: lax

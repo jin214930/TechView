@@ -67,6 +67,16 @@ public class AuthService {
         return new LoginResult(refreshToken.value(), LoginResponse.of(accessToken, member));
     }
 
+    @Transactional
+    public void logout(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+
+        refreshTokenRepository.findByToken(refreshToken)
+                .ifPresent(token -> token.revoke(OffsetDateTime.now(ZoneOffset.UTC)));
+    }
+
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }

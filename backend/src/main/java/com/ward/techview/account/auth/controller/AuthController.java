@@ -38,4 +38,14 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, tokenCookieManager.create(result.refreshToken()).toString());
         return ApiResponse.from(AuthResponseCode.LOGIN_SUCCESS, result.loginResponse());
     }
+
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(
+            @CookieValue(name = "refreshToken", required = false) String refreshToken,
+            HttpServletResponse response
+    ) {
+        authService.logout(refreshToken);
+        response.addHeader(HttpHeaders.SET_COOKIE, tokenCookieManager.expire().toString());
+        return ApiResponse.from(AuthResponseCode.LOGOUT_SUCCESS);
+    }
 }
