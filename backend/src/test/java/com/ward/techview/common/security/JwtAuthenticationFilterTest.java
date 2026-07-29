@@ -72,6 +72,22 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("Bearer 인증 스킴은 대소문자를 구분하지 않는다")
+    void shouldAuthenticateWhenBearerSchemeUsesLowercase() throws Exception {
+        CustomUserDetails principal = new CustomUserDetails(1L, "user@example.com");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "bearer access-token");
+        when(jwtProvider.getAccessTokenPrincipal("access-token")).thenReturn(principal);
+
+        jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(authentication);
+        assertSame(principal, authentication.getPrincipal());
+        verify(jwtProvider).getAccessTokenPrincipal("access-token");
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
     @DisplayName("Authorization 헤더가 없으면 익명 상태로 필터 체인을 진행한다")
     void shouldContinueWithoutAuthenticationWhenAuthorizationHeaderIsMissing() throws Exception {
         jwtAuthenticationFilter.doFilter(request, response, filterChain);
