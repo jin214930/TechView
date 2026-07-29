@@ -22,3 +22,9 @@ logging:
     root: INFO
     com.ward.techview: DEBUG
     org.hibernate.SQL: DEBUG
+
+custom:
+  cookie:
+    token:
+      secure: false
+      same-site: lax
