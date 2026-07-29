@@ -12,3 +12,12 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
+
+custom:
+  jwt:
+    issuer: techView
+    secret-key: ${JWT_SECRET_KEY}
+    access-token:
+      expiration-time: ${JWT_ACCESS_TOKEN_EXPIRATION_TIME}
+    refresh-token:
+      expiration-time: ${JWT_REFRESH_TOKEN_EXPIRATION_TIME}

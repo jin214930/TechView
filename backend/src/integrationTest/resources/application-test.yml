@@ -6,3 +6,12 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+
+custom:
+  jwt:
+    issuer: techView-test
+    secret-key: TECHVIEW_JWT_SECRET_KEY_FOR_INTEGRATION_TESTS
+    access-token:
+      expiration-time: 15m
+    refresh-token:
+      expiration-time: 30d
