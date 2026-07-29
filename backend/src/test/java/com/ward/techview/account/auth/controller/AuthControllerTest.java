@@ -212,4 +212,57 @@ class AuthControllerTest {
 
         verify(tokenCookieManager, never()).create(any());
     }
+
+    @Test
+    @DisplayName("로그아웃하면 Refresh Token을 폐기하고 만료 쿠키를 반환한다")
+    void shouldRevokeRefreshTokenAndExpireCookieWhenLogoutSucceeds() throws Exception {
+        ResponseCookie expiredCookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .path("/api/v1/auth")
+                .maxAge(0)
+                .build();
+        when(tokenCookieManager.expire()).thenReturn(expiredCookie);
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie("refreshToken", "refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        allOf(
+                                containsString("refreshToken="),
+                                containsString("Path=/api/v1/auth"),
+                                containsString("Max-Age=0"),
+                                containsString("HttpOnly")
+                        )
+                ))
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("로그아웃이 완료되었습니다."))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(authService).logout("refresh-token");
+        verify(tokenCookieManager).expire();
+    }
+
+    @Test
+    @DisplayName("Refresh Token 쿠키가 없어도 로그아웃에 성공하고 만료 쿠키를 반환한다")
+    void shouldCompleteLogoutAndExpireCookieWhenRefreshTokenIsMissing() throws Exception {
+        ResponseCookie expiredCookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .path("/api/v1/auth")
+                .maxAge(0)
+                .build();
+        when(tokenCookieManager.expire()).thenReturn(expiredCookie);
+
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        containsString("Max-Age=0")
+                ))
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("로그아웃이 완료되었습니다."));
+
+        verify(authService).logout(null);
+        verify(tokenCookieManager).expire();
+    }
 }

@@ -14,6 +14,9 @@ import com.ward.techview.common.security.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -236,6 +239,44 @@ class AuthServiceTest {
         );
 
         verify(refreshTokenRepository).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("로그아웃 시 Refresh Token이 존재하면 해당 토큰을 폐기한다")
+    void shouldRevokeRefreshTokenWhenLogoutTokenExists() {
+        RefreshToken refreshToken = RefreshToken.create(
+                "refresh-token",
+                1L,
+                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
+        );
+        when(refreshTokenRepository.findByToken("refresh-token"))
+                .thenReturn(Optional.of(refreshToken));
+
+        authService.logout("refresh-token");
+
+        assertNotNull(refreshToken.getRevokedAt());
+        verify(refreshTokenRepository).findByToken("refresh-token");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "   ")
+    @DisplayName("로그아웃 토큰이 없거나 비어 있으면 저장소를 조회하지 않는다")
+    void shouldNotQueryRepositoryWhenLogoutTokenIsBlank(String refreshToken) {
+        authService.logout(refreshToken);
+
+        verify(refreshTokenRepository, never()).findByToken(any());
+    }
+
+    @Test
+    @DisplayName("로그아웃 토큰이 DB에 없어도 예외 없이 완료한다")
+    void shouldCompleteLogoutWhenRefreshTokenIsNotFound() {
+        when(refreshTokenRepository.findByToken("unknown-token"))
+                .thenReturn(Optional.empty());
+
+        authService.logout("unknown-token");
+
+        verify(refreshTokenRepository).findByToken("unknown-token");
     }
 
     private void stubSuccessfulLogin(Member member) {
