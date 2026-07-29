@@ -2,7 +2,6 @@ package com.ward.techview.account.auth.service;
 
 import com.ward.techview.account.auth.dto.*;
 import com.ward.techview.account.auth.entity.RefreshToken;
-import com.ward.techview.account.auth.repository.RefreshTokenRepository;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.member.entity.Member;
 import com.ward.techview.account.member.repository.MemberRepository;
@@ -17,15 +16,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
     private final MemberRepository memberRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenService refreshTokenService;
     private final JwtProvider jwtProvider;
     private final PasswordEncoder passwordEncoder;
 
@@ -61,19 +58,14 @@ public class AuthService {
         IssuedToken accessToken = jwtProvider.generateAccessToken(member.getId(), member.getEmail());
         IssuedToken refreshToken = jwtProvider.generateRefreshToken(member.getId(), member.getEmail());
 
-        saveOrRotateRefreshToken(member, existingRefreshToken, refreshToken);
+        refreshTokenService.saveOrRotate(member.getId(), existingRefreshToken, refreshToken);
 
         return new LoginResult(refreshToken.value(), LoginResponse.of(accessToken, member));
     }
 
     @Transactional
     public void logout(String refreshToken) {
-        if (refreshToken == null || refreshToken.isBlank()) {
-            return;
-        }
-
-        refreshTokenRepository.findByToken(refreshToken)
-                .ifPresent(token -> token.revoke(OffsetDateTime.now(ZoneOffset.UTC)));
+        refreshTokenService.revoke(refreshToken);
     }
 
     @Transactional
@@ -83,16 +75,7 @@ public class AuthService {
             throw new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED);
         }
 
-        RefreshToken refreshTokenEntity = refreshTokenRepository.findByToken(refreshToken)
-                .orElseThrow(() -> new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED));
-
-        if (!refreshTokenEntity.isActive(OffsetDateTime.now(ZoneOffset.UTC))) {
-            throw new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED);
-        }
-
-        if (!refreshTokenEntity.getMemberId().equals(principal.id())) {
-            throw new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED);
-        }
+        RefreshToken refreshTokenEntity = refreshTokenService.getActiveToken(refreshToken, principal.id());
 
         Member member = memberRepository.findById(principal.id())
                 .orElseThrow(() -> new BusinessException(CommonResponseCode.AUTHENTICATION_REQUIRED));
@@ -100,7 +83,7 @@ public class AuthService {
         IssuedToken accessToken = jwtProvider.generateAccessToken(member.getId(), member.getEmail());
         IssuedToken newRefreshToken = jwtProvider.generateRefreshToken(member.getId(), member.getEmail());
 
-        refreshTokenEntity.rotate(newRefreshToken.value(), newRefreshToken.expiresAt());
+        refreshTokenService.rotate(refreshTokenEntity, newRefreshToken);
 
         return new TokenReissueResult(newRefreshToken.value(), new TokenResponse(accessToken.value()));
     }
@@ -109,30 +92,4 @@ public class AuthService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
-    private void saveOrRotateRefreshToken(Member member, String existingRefreshToken, IssuedToken newToken) {
-        if (existingRefreshToken == null || existingRefreshToken.isBlank()) {
-            saveRefreshToken(member, newToken);
-            return;
-        }
-
-        refreshTokenRepository.findByToken(existingRefreshToken)
-                .ifPresentOrElse(
-                        existingToken -> handleExistingToken(member, existingToken, newToken),
-                        () -> saveRefreshToken(member, newToken)
-                );
-    }
-
-    private void handleExistingToken(Member member, RefreshToken existingToken, IssuedToken newToken) {
-        if (existingToken.getMemberId().equals(member.getId())) {
-            existingToken.rotate(newToken.value(), newToken.expiresAt());
-            return;
-        }
-
-        existingToken.revoke(OffsetDateTime.now(ZoneOffset.UTC));
-        saveRefreshToken(member, newToken);
-    }
-
-    private void saveRefreshToken(Member member, IssuedToken token) {
-        refreshTokenRepository.save(RefreshToken.create(token.value(), member.getId(), token.expiresAt()));
-    }
 }

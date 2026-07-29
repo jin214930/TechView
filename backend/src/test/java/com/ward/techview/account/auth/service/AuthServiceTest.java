@@ -3,8 +3,6 @@ package com.ward.techview.account.auth.service;
 import com.ward.techview.account.auth.dto.LoginRequest;
 import com.ward.techview.account.auth.dto.LoginResult;
 import com.ward.techview.account.auth.dto.SignUpRequest;
-import com.ward.techview.account.auth.entity.RefreshToken;
-import com.ward.techview.account.auth.repository.RefreshTokenRepository;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.member.entity.Member;
 import com.ward.techview.account.member.repository.MemberRepository;
@@ -14,9 +12,6 @@ import com.ward.techview.common.security.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -31,8 +26,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,7 +43,7 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private RefreshTokenRepository refreshTokenRepository;
+    private RefreshTokenService refreshTokenService;
 
     @Mock
     private JwtProvider jwtProvider;
@@ -116,8 +109,6 @@ class AuthServiceTest {
         LoginRequest request = new LoginRequest(" User@Example.com ", "password123!");
         IssuedToken accessToken = accessToken();
         IssuedToken refreshToken = refreshToken();
-        ArgumentCaptor<RefreshToken> tokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
-
         when(memberRepository.findByEmail("user@example.com")).thenReturn(Optional.of(member));
         when(passwordEncoder.matches("password123!", member.getPassword())).thenReturn(true);
         when(jwtProvider.generateAccessToken(1L, "user@example.com")).thenReturn(accessToken);
@@ -132,14 +123,7 @@ class AuthServiceTest {
                 () -> assertEquals("user@example.com", result.loginResponse().email()),
                 () -> assertEquals("사용자", result.loginResponse().nickname())
         );
-        verify(refreshTokenRepository).save(tokenCaptor.capture());
-        RefreshToken savedToken = tokenCaptor.getValue();
-        assertAll(
-                () -> assertEquals("refresh-token", savedToken.getToken()),
-                () -> assertEquals(1L, savedToken.getMemberId()),
-                () -> assertEquals(refreshToken.expiresAt(), savedToken.getExpiresAt()),
-                () -> assertNull(savedToken.getRevokedAt())
-        );
+        verify(refreshTokenService).saveOrRotate(1L, null, refreshToken);
     }
 
     @Test
@@ -156,7 +140,7 @@ class AuthServiceTest {
         assertSame(AuthResponseCode.LOGIN_FAILED, exception.getResponseCode());
         verify(passwordEncoder, never()).matches(any(), any());
         verify(jwtProvider, never()).generateAccessToken(any(), any());
-        verify(refreshTokenRepository, never()).save(any());
+        verify(refreshTokenService, never()).saveOrRotate(any(), any(), any());
     }
 
     @Test
@@ -174,116 +158,15 @@ class AuthServiceTest {
 
         assertSame(AuthResponseCode.LOGIN_FAILED, exception.getResponseCode());
         verify(jwtProvider, never()).generateAccessToken(any(), any());
-        verify(refreshTokenRepository, never()).save(any());
+        verify(refreshTokenService, never()).saveOrRotate(any(), any(), any());
     }
 
     @Test
-    @DisplayName("같은 회원의 Refresh Token이 있으면 기존 행을 새 토큰으로 회전한다")
-    void shouldRotateExistingRefreshTokenForSameMember() {
-        Member member = member(1L);
-        RefreshToken existingToken = RefreshToken.create(
-                "existing-refresh-token",
-                1L,
-                OffsetDateTime.now(ZoneOffset.UTC).minusDays(1)
-        );
-        existingToken.revoke(OffsetDateTime.now(ZoneOffset.UTC));
-        stubSuccessfulLogin(member);
-        when(refreshTokenRepository.findByToken("existing-refresh-token"))
-                .thenReturn(Optional.of(existingToken));
-
-        authService.login(
-                new LoginRequest("user@example.com", "password123!"),
-                "existing-refresh-token"
-        );
-
-        assertAll(
-                () -> assertEquals("refresh-token", existingToken.getToken()),
-                () -> assertEquals(refreshToken().expiresAt(), existingToken.getExpiresAt()),
-                () -> assertNull(existingToken.getRevokedAt())
-        );
-        verify(refreshTokenRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("다른 회원의 Refresh Token이면 기존 토큰을 폐기하고 새 행을 저장한다")
-    void shouldRevokeExistingTokenAndSaveNewTokenForDifferentMember() {
-        Member member = member(1L);
-        RefreshToken otherMemberToken = RefreshToken.create(
-                "other-member-token",
-                2L,
-                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
-        );
-        stubSuccessfulLogin(member);
-        when(refreshTokenRepository.findByToken("other-member-token"))
-                .thenReturn(Optional.of(otherMemberToken));
-
-        authService.login(
-                new LoginRequest("user@example.com", "password123!"),
-                "other-member-token"
-        );
-
-        assertNotNull(otherMemberToken.getRevokedAt());
-        verify(refreshTokenRepository).save(any(RefreshToken.class));
-    }
-
-    @Test
-    @DisplayName("전달된 Refresh Token이 DB에 없으면 새 행을 저장한다")
-    void shouldSaveNewRefreshTokenWhenExistingTokenIsNotFound() {
-        Member member = member(1L);
-        stubSuccessfulLogin(member);
-        when(refreshTokenRepository.findByToken("unknown-token")).thenReturn(Optional.empty());
-
-        authService.login(
-                new LoginRequest("user@example.com", "password123!"),
-                "unknown-token"
-        );
-
-        verify(refreshTokenRepository).save(any(RefreshToken.class));
-    }
-
-    @Test
-    @DisplayName("로그아웃 시 Refresh Token이 존재하면 해당 토큰을 폐기한다")
-    void shouldRevokeRefreshTokenWhenLogoutTokenExists() {
-        RefreshToken refreshToken = RefreshToken.create(
-                "refresh-token",
-                1L,
-                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
-        );
-        when(refreshTokenRepository.findByToken("refresh-token"))
-                .thenReturn(Optional.of(refreshToken));
-
+    @DisplayName("로그아웃 시 Refresh Token 폐기를 위임한다")
+    void shouldDelegateRefreshTokenRevocationWhenLogout() {
         authService.logout("refresh-token");
 
-        assertNotNull(refreshToken.getRevokedAt());
-        verify(refreshTokenRepository).findByToken("refresh-token");
-    }
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = "   ")
-    @DisplayName("로그아웃 토큰이 없거나 비어 있으면 저장소를 조회하지 않는다")
-    void shouldNotQueryRepositoryWhenLogoutTokenIsBlank(String refreshToken) {
-        authService.logout(refreshToken);
-
-        verify(refreshTokenRepository, never()).findByToken(any());
-    }
-
-    @Test
-    @DisplayName("로그아웃 토큰이 DB에 없어도 예외 없이 완료한다")
-    void shouldCompleteLogoutWhenRefreshTokenIsNotFound() {
-        when(refreshTokenRepository.findByToken("unknown-token"))
-                .thenReturn(Optional.empty());
-
-        authService.logout("unknown-token");
-
-        verify(refreshTokenRepository).findByToken("unknown-token");
-    }
-
-    private void stubSuccessfulLogin(Member member) {
-        when(memberRepository.findByEmail("user@example.com")).thenReturn(Optional.of(member));
-        when(passwordEncoder.matches("password123!", member.getPassword())).thenReturn(true);
-        when(jwtProvider.generateAccessToken(member.getId(), member.getEmail())).thenReturn(accessToken());
-        when(jwtProvider.generateRefreshToken(member.getId(), member.getEmail())).thenReturn(refreshToken());
+        verify(refreshTokenService).revoke("refresh-token");
     }
 
     private static Member member(Long id) {
