@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 public class JwtProvider {
@@ -81,6 +82,7 @@ public class JwtProvider {
         Instant expiration = now.plus(expirationTime);
 
         String token = Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .issuer(issuer)
                 .subject(email)
                 .claim(MEMBER_ID, memberId)

@@ -42,9 +42,9 @@ public class RefreshTokenService {
                 .ifPresent(refreshToken -> refreshToken.revoke(now()));
     }
 
-    @Transactional(propagation = Propagation.MANDATORY, readOnly = true)
+    @Transactional(propagation = Propagation.MANDATORY)
     public RefreshToken getActiveToken(String token, Long memberId) {
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenForUpdate(token)
                 .orElseThrow(this::authenticationRequired);
 
         if (!refreshToken.isActive(now()) || !refreshToken.getMemberId().equals(memberId)) {

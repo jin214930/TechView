@@ -131,10 +131,10 @@ class RefreshTokenServiceTest {
     }
 
     @Test
-    @DisplayName("활성 상태이고 회원이 일치하는 Refresh Token을 반환한다")
+    @DisplayName("비관적 잠금으로 조회한 Refresh Token이 활성 상태이고 회원이 일치하면 반환한다")
     void shouldReturnActiveTokenForMatchingMember() {
         RefreshToken refreshToken = token("refresh-token", MEMBER_ID, future());
-        when(refreshTokenRepository.findByToken("refresh-token"))
+        when(refreshTokenRepository.findByTokenForUpdate("refresh-token"))
                 .thenReturn(Optional.of(refreshToken));
 
         RefreshToken result = refreshTokenService.getActiveToken("refresh-token", MEMBER_ID);
@@ -145,7 +145,7 @@ class RefreshTokenServiceTest {
     @Test
     @DisplayName("Refresh Token이 DB에 없으면 인증 필요 예외를 발생시킨다")
     void shouldThrowAuthenticationRequiredWhenTokenIsNotFound() {
-        when(refreshTokenRepository.findByToken("unknown-token"))
+        when(refreshTokenRepository.findByTokenForUpdate("unknown-token"))
                 .thenReturn(Optional.empty());
 
         BusinessException exception = assertThrows(
@@ -161,7 +161,7 @@ class RefreshTokenServiceTest {
     void shouldThrowAuthenticationRequiredWhenTokenIsRevoked() {
         RefreshToken refreshToken = token("refresh-token", MEMBER_ID, future());
         refreshToken.revoke(OffsetDateTime.now(ZoneOffset.UTC));
-        when(refreshTokenRepository.findByToken("refresh-token"))
+        when(refreshTokenRepository.findByTokenForUpdate("refresh-token"))
                 .thenReturn(Optional.of(refreshToken));
 
         assertAuthenticationRequired("refresh-token", MEMBER_ID);
@@ -175,7 +175,7 @@ class RefreshTokenServiceTest {
                 MEMBER_ID,
                 OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(1)
         );
-        when(refreshTokenRepository.findByToken("refresh-token"))
+        when(refreshTokenRepository.findByTokenForUpdate("refresh-token"))
                 .thenReturn(Optional.of(refreshToken));
 
         assertAuthenticationRequired("refresh-token", MEMBER_ID);
@@ -185,7 +185,7 @@ class RefreshTokenServiceTest {
     @DisplayName("Refresh Token 회원이 일치하지 않으면 인증 필요 예외를 발생시킨다")
     void shouldThrowAuthenticationRequiredWhenMemberDoesNotMatch() {
         RefreshToken refreshToken = token("refresh-token", 2L, future());
-        when(refreshTokenRepository.findByToken("refresh-token"))
+        when(refreshTokenRepository.findByTokenForUpdate("refresh-token"))
                 .thenReturn(Optional.of(refreshToken));
 
         assertAuthenticationRequired("refresh-token", MEMBER_ID);

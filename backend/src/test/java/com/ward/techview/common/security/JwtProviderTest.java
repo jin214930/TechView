@@ -16,6 +16,7 @@ import java.util.Date;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -84,6 +85,23 @@ class JwtProviderTest {
         assertNotNull(principal);
         assertEquals(MEMBER_ID, principal.id());
         assertEquals(EMAIL, principal.email());
+    }
+
+    @Test
+    @DisplayName("같은 회원에게 연속 발급한 Refresh Token은 서로 다른 jti와 토큰 값을 가진다")
+    void shouldGenerateRefreshTokensWithUniqueIdentifiers() {
+        IssuedToken firstToken = jwtProvider.generateRefreshToken(MEMBER_ID, EMAIL);
+        IssuedToken secondToken = jwtProvider.generateRefreshToken(MEMBER_ID, EMAIL);
+
+        String firstTokenId = parse(firstToken.value(), ISSUER, secretKey).getPayload().getId();
+        String secondTokenId = parse(secondToken.value(), ISSUER, secretKey).getPayload().getId();
+
+        assertAll(
+                () -> assertNotNull(firstTokenId),
+                () -> assertNotNull(secondTokenId),
+                () -> assertNotEquals(firstTokenId, secondTokenId),
+                () -> assertNotEquals(firstToken.value(), secondToken.value())
+        );
     }
 
     @Test
