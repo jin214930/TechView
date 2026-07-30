@@ -214,6 +214,18 @@ class RefreshTokenServiceTest {
         );
     }
 
+    @Test
+    @DisplayName("만료·폐기 Refresh Token 삭제 결과를 반환한다")
+    void shouldReturnDeletedExpiredOrRevokedTokenCount() {
+        when(refreshTokenRepository.deleteExpiredOrRevoked(any(OffsetDateTime.class)))
+                .thenReturn(2);
+
+        int deletedCount = refreshTokenService.deleteExpiredOrRevoked();
+
+        assertEquals(2, deletedCount);
+        verify(refreshTokenRepository).deleteExpiredOrRevoked(any(OffsetDateTime.class));
+    }
+
     private void assertAuthenticationRequired(String token, Long memberId) {
         BusinessException exception = assertThrows(
                 BusinessException.class,

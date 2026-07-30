@@ -30,3 +30,6 @@ custom:
   auth:
     refresh-token:
       hash-secret-key: ${REFRESH_TOKEN_HASH_SECRET_KEY}
+      cleanup:
+        cron: "0 0 3 * * *"
+        time-zone: Asia/Seoul

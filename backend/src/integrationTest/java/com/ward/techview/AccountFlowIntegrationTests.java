@@ -1,7 +1,9 @@
 package com.ward.techview;
 
 import com.jayway.jsonpath.JsonPath;
+import com.ward.techview.account.auth.entity.RefreshToken;
 import com.ward.techview.account.auth.repository.RefreshTokenRepository;
+import com.ward.techview.account.auth.service.RefreshTokenService;
 import com.ward.techview.account.auth.token.RefreshTokenHasher;
 import com.ward.techview.account.member.repository.MemberRepository;
 import io.jsonwebtoken.Jwts;
@@ -27,6 +29,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -76,6 +80,9 @@ class AccountFlowIntegrationTests {
 
     @Autowired
     private RefreshTokenHasher refreshTokenHasher;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
 
     @BeforeEach
     void cleanDatabase() {
@@ -260,6 +267,41 @@ class AccountFlowIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(session.accessToken())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(2002));
+    }
+
+    @Test
+    @DisplayName("만료·폐기 Refresh Token만 삭제하고 활성 토큰은 유지한다")
+    void shouldDeleteOnlyExpiredOrRevokedRefreshTokens() throws Exception {
+        signUp(EMAIL, PASSWORD, NICKNAME)
+                .andExpect(status().isCreated());
+        Long memberId = memberRepository.findByEmail(EMAIL)
+                .orElseThrow()
+                .getId();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        RefreshToken expiredToken = RefreshToken.create(
+                hash("expired-refresh-token"),
+                memberId,
+                now.minusSeconds(1)
+        );
+        RefreshToken revokedToken = RefreshToken.create(
+                hash("revoked-refresh-token"),
+                memberId,
+                now.plusDays(1)
+        );
+        revokedToken.revoke(now);
+        RefreshToken activeToken = RefreshToken.create(
+                hash("active-refresh-token"),
+                memberId,
+                now.plusDays(1)
+        );
+        refreshTokenRepository.saveAllAndFlush(List.of(expiredToken, revokedToken, activeToken));
+
+        int deletedCount = refreshTokenService.deleteExpiredOrRevoked();
+
+        assertEquals(2, deletedCount);
+        assertEquals(1, refreshTokenRepository.count());
+        assertTrue(refreshTokenRepository.findByToken(hash("active-refresh-token")).isPresent());
     }
 
     private org.springframework.test.web.servlet.ResultActions signUp(

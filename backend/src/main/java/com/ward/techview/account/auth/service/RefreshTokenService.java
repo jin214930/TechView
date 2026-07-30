@@ -67,6 +67,11 @@ public class RefreshTokenService {
         applyRotation(token, newToken);
     }
 
+    @Transactional
+    public int deleteExpiredOrRevoked() {
+        return refreshTokenRepository.deleteExpiredOrRevoked(now());
+    }
+
     private void handleExistingToken(Long memberId, RefreshToken existingToken, IssuedToken newToken) {
         if (existingToken.getMemberId().equals(memberId)) {
             applyRotation(existingToken, newToken);
