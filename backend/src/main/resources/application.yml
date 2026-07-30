@@ -27,3 +27,6 @@ custom:
     token:
       http-only: true
       path: "/api/v1/auth"
+  auth:
+    refresh-token:
+      hash-secret-key: ${REFRESH_TOKEN_HASH_SECRET_KEY}

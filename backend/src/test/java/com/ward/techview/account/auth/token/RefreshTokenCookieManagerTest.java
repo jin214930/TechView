@@ -1,4 +1,4 @@
-package com.ward.techview.account.auth.cookie;
+package com.ward.techview.account.auth.token;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

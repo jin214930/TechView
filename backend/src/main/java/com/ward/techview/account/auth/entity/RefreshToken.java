@@ -19,7 +19,7 @@ import java.time.OffsetDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RefreshToken extends BaseEntity {
-    @Column(nullable = false, unique = true, length = 512)
+    @Column(nullable = false, unique = true)
     private String token;
 
     @Column(nullable = false)

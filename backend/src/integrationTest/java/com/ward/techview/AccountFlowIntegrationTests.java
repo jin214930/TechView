@@ -2,6 +2,7 @@ package com.ward.techview;
 
 import com.jayway.jsonpath.JsonPath;
 import com.ward.techview.account.auth.repository.RefreshTokenRepository;
+import com.ward.techview.account.auth.token.RefreshTokenHasher;
 import com.ward.techview.account.member.repository.MemberRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -73,6 +74,9 @@ class AccountFlowIntegrationTests {
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Autowired
+    private RefreshTokenHasher refreshTokenHasher;
+
     @BeforeEach
     void cleanDatabase() {
         refreshTokenRepository.deleteAllInBatch();
@@ -97,6 +101,8 @@ class AccountFlowIntegrationTests {
 
         assertEquals(1, memberRepository.count());
         assertEquals(1, refreshTokenRepository.count());
+        assertFalse(refreshTokenRepository.findByToken(session.refreshToken()).isPresent());
+        assertTrue(refreshTokenRepository.findByToken(hash(session.refreshToken())).isPresent());
     }
 
     @Test
@@ -145,8 +151,9 @@ class AccountFlowIntegrationTests {
         String rotatedRefreshToken = refreshTokenFrom(reissueResult);
 
         assertNotEquals(session.refreshToken(), rotatedRefreshToken);
-        assertFalse(refreshTokenRepository.findByToken(session.refreshToken()).isPresent());
-        assertTrue(refreshTokenRepository.findByToken(rotatedRefreshToken).isPresent());
+        assertFalse(refreshTokenRepository.findByToken(hash(session.refreshToken())).isPresent());
+        assertFalse(refreshTokenRepository.findByToken(rotatedRefreshToken).isPresent());
+        assertTrue(refreshTokenRepository.findByToken(hash(rotatedRefreshToken)).isPresent());
 
         refresh(session.refreshToken())
                 .andExpect(status().isUnauthorized())
@@ -316,6 +323,10 @@ class AccountFlowIntegrationTests {
 
     private static String bearer(String token) {
         return "Bearer " + token;
+    }
+
+    private String hash(String rawToken) {
+        return refreshTokenHasher.hash(rawToken);
     }
 
     private static String tamper(String token) {

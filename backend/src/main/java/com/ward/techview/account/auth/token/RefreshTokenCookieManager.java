@@ -1,4 +1,4 @@
-package com.ward.techview.account.auth.cookie;
+package com.ward.techview.account.auth.token;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;

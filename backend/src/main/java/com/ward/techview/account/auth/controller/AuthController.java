@@ -3,7 +3,7 @@ package com.ward.techview.account.auth.controller;
 import com.ward.techview.account.auth.dto.*;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.auth.service.AuthService;
-import com.ward.techview.account.auth.cookie.RefreshTokenCookieManager;
+import com.ward.techview.account.auth.token.RefreshTokenCookieManager;
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.common.response.ApiResponse;
 import com.ward.techview.common.response.CommonResponseCode;

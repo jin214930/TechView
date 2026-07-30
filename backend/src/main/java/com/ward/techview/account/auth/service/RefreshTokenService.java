@@ -2,6 +2,7 @@ package com.ward.techview.account.auth.service;
 
 import com.ward.techview.account.auth.entity.RefreshToken;
 import com.ward.techview.account.auth.repository.RefreshTokenRepository;
+import com.ward.techview.account.auth.token.RefreshTokenHasher;
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.common.response.CommonResponseCode;
 import com.ward.techview.common.security.IssuedToken;
@@ -17,6 +18,7 @@ import java.time.ZoneOffset;
 @RequiredArgsConstructor
 public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenHasher refreshTokenHasher;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void saveOrRotate(Long memberId, String existingToken, IssuedToken newToken) {
@@ -25,7 +27,9 @@ public class RefreshTokenService {
             return;
         }
 
-        refreshTokenRepository.findByToken(existingToken)
+        String existingTokenHash = refreshTokenHasher.hash(existingToken);
+
+        refreshTokenRepository.findByToken(existingTokenHash)
                 .ifPresentOrElse(
                         token -> handleExistingToken(memberId, token, newToken),
                         () -> save(memberId, newToken)
@@ -38,13 +42,17 @@ public class RefreshTokenService {
             return;
         }
 
-        refreshTokenRepository.findByToken(token)
+        String tokenHash = refreshTokenHasher.hash(token);
+
+        refreshTokenRepository.findByToken(tokenHash)
                 .ifPresent(refreshToken -> refreshToken.revoke(now()));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public RefreshToken getActiveToken(String token, Long memberId) {
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenForUpdate(token)
+        String tokenHash = refreshTokenHasher.hash(token);
+
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenForUpdate(tokenHash)
                 .orElseThrow(this::authenticationRequired);
 
         if (!refreshToken.isActive(now()) || !refreshToken.getMemberId().equals(memberId)) {
@@ -56,12 +64,12 @@ public class RefreshTokenService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void rotate(RefreshToken token, IssuedToken newToken) {
-        token.rotate(newToken.value(), newToken.expiresAt());
+        applyRotation(token, newToken);
     }
 
     private void handleExistingToken(Long memberId, RefreshToken existingToken, IssuedToken newToken) {
         if (existingToken.getMemberId().equals(memberId)) {
-            existingToken.rotate(newToken.value(), newToken.expiresAt());
+            applyRotation(existingToken, newToken);
             return;
         }
 
@@ -69,8 +77,14 @@ public class RefreshTokenService {
         save(memberId, newToken);
     }
 
+    private void applyRotation(RefreshToken token, IssuedToken newToken) {
+        String tokenHash = refreshTokenHasher.hash(newToken.value());
+        token.rotate(tokenHash, newToken.expiresAt());
+    }
+
     private void save(Long memberId, IssuedToken token) {
-        refreshTokenRepository.save(RefreshToken.create(token.value(), memberId, token.expiresAt()));
+        String tokenHash = refreshTokenHasher.hash(token.value());
+        refreshTokenRepository.save(RefreshToken.create(tokenHash, memberId, token.expiresAt()));
     }
 
     private BusinessException authenticationRequired() {
