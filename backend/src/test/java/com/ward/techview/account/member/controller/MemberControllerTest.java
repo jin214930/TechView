@@ -1,6 +1,6 @@
 package com.ward.techview.account.member.controller;
 
-import com.ward.techview.account.auth.cookie.RefreshTokenCookieManager;
+import com.ward.techview.account.auth.token.RefreshTokenCookieManager;
 import com.ward.techview.account.member.dto.MemberResponse;
 import com.ward.techview.account.member.response.MemberResponseCode;
 import com.ward.techview.account.member.service.MemberService;

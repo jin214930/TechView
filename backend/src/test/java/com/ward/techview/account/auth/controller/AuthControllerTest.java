@@ -8,7 +8,7 @@ import com.ward.techview.account.auth.dto.TokenReissueResult;
 import com.ward.techview.account.auth.dto.TokenResponse;
 import com.ward.techview.account.auth.response.AuthResponseCode;
 import com.ward.techview.account.auth.service.AuthService;
-import com.ward.techview.account.auth.cookie.RefreshTokenCookieManager;
+import com.ward.techview.account.auth.token.RefreshTokenCookieManager;
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.common.exception.GlobalExceptionHandler;
 import com.ward.techview.common.response.ApiResponseAdvice;
