@@ -74,6 +74,7 @@ class AnswerUploadControllerTest {
         AnswerCreateRequest request = new AnswerCreateRequest("audio/webm", 42_000);
         AnswerCreateResponse response = new AnswerCreateResponse(
                 ANSWER_ID,
+                true,
                 URI.create("http://localhost:9000/techview-audio/upload"),
                 OffsetDateTime.of(2026, 7, 31, 12, 5, 0, 0, ZoneOffset.UTC)
         );
@@ -91,11 +92,41 @@ class AnswerUploadControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.answerId").value(ANSWER_ID))
+                .andExpect(jsonPath("$.data.created").value(true))
                 .andExpect(jsonPath("$.data.uploadUrl")
                         .value("http://localhost:9000/techview-audio/upload"))
                 .andExpect(jsonPath("$.data.uploadExpiresAt").exists());
 
         verify(answerUploadService).createUpload(MEMBER_ID, SESSION_ID, TURN_ID, request);
+    }
+
+    @Test
+    @DisplayName("기존 답변의 업로드 URL을 재발급하면 HTTP 200을 반환한다")
+    void shouldReturnOkWhenUploadUrlIsReissued() throws Exception {
+        AnswerCreateRequest request = new AnswerCreateRequest("audio/webm", 42_000);
+        AnswerCreateResponse response = new AnswerCreateResponse(
+                ANSWER_ID,
+                false,
+                URI.create("http://localhost:9000/techview-audio/upload-reissued"),
+                OffsetDateTime.of(2026, 7, 31, 12, 10, 0, 0, ZoneOffset.UTC)
+        );
+        when(answerUploadService.createUpload(MEMBER_ID, SESSION_ID, TURN_ID, request))
+                .thenReturn(response);
+
+        mockMvc.perform(post(ENDPOINT, SESSION_ID, TURN_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "audioContentType": "audio/webm",
+                                  "audioDurationMs": 42000
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.answerId").value(ANSWER_ID))
+                .andExpect(jsonPath("$.data.created").value(false))
+                .andExpect(jsonPath("$.data.uploadUrl")
+                        .value("http://localhost:9000/techview-audio/upload-reissued"));
     }
 
     @Test

@@ -2,8 +2,8 @@ package com.ward.techview.voice.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
-import com.ward.techview.interview.api.CreatedAnswer;
 import com.ward.techview.interview.api.InterviewAnswerApi;
+import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.voice.api.AudioStorage;
 import com.ward.techview.voice.api.PresignedUpload;
 import com.ward.techview.voice.domain.AudioObjectKeyGenerator;
@@ -64,8 +64,8 @@ class AnswerUploadServiceTest {
     void shouldCreateAnswerAndIssueUploadUrl() {
         AnswerCreateRequest request = new AnswerCreateRequest(CONTENT_TYPE, DURATION_MS);
         when(audioObjectKeyGenerator.generate(SESSION_ID, TURN_ID)).thenReturn(OBJECT_KEY);
-        when(interviewAnswerApi.createAnswer(any(AnswerCreateCommand.class)))
-                .thenReturn(new CreatedAnswer(ANSWER_ID));
+        when(interviewAnswerApi.prepareAnswer(any(AnswerCreateCommand.class)))
+                .thenReturn(new PreparedAnswer(ANSWER_ID, OBJECT_KEY, CONTENT_TYPE, true));
         when(audioStorage.issueUploadUrl(OBJECT_KEY, CONTENT_TYPE))
                 .thenReturn(new PresignedUpload(UPLOAD_URL, EXPIRES_AT));
 
@@ -78,13 +78,14 @@ class AnswerUploadServiceTest {
 
         assertAll(
                 () -> assertEquals(ANSWER_ID, response.answerId()),
+                () -> assertEquals(true, response.created()),
                 () -> assertEquals(UPLOAD_URL, response.uploadUrl()),
                 () -> assertEquals(EXPIRES_AT, response.uploadExpiresAt())
         );
 
         ArgumentCaptor<AnswerCreateCommand> commandCaptor =
                 ArgumentCaptor.forClass(AnswerCreateCommand.class);
-        verify(interviewAnswerApi).createAnswer(commandCaptor.capture());
+        verify(interviewAnswerApi).prepareAnswer(commandCaptor.capture());
         AnswerCreateCommand command = commandCaptor.getValue();
         assertAll(
                 () -> assertEquals(MEMBER_ID, command.memberId()),
@@ -97,7 +98,7 @@ class AnswerUploadServiceTest {
 
         InOrder order = inOrder(audioObjectKeyGenerator, interviewAnswerApi, audioStorage);
         order.verify(audioObjectKeyGenerator).generate(SESSION_ID, TURN_ID);
-        order.verify(interviewAnswerApi).createAnswer(any(AnswerCreateCommand.class));
+        order.verify(interviewAnswerApi).prepareAnswer(any(AnswerCreateCommand.class));
         order.verify(audioStorage).issueUploadUrl(OBJECT_KEY, CONTENT_TYPE);
     }
 
@@ -113,7 +114,7 @@ class AnswerUploadServiceTest {
 
         assertSame(VoiceResponseCode.UNSUPPORTED_AUDIO_CONTENT_TYPE, exception.getResponseCode());
         verify(audioObjectKeyGenerator, never()).generate(any(), any());
-        verify(interviewAnswerApi, never()).createAnswer(any());
+        verify(interviewAnswerApi, never()).prepareAnswer(any());
         verify(audioStorage, never()).issueUploadUrl(any(), any());
     }
 
@@ -128,7 +129,7 @@ class AnswerUploadServiceTest {
         );
 
         assertSame(VoiceResponseCode.AUDIO_DURATION_INVALID, exception.getResponseCode());
-        verify(interviewAnswerApi, never()).createAnswer(any());
+        verify(interviewAnswerApi, never()).prepareAnswer(any());
         verify(audioStorage, never()).issueUploadUrl(any(), any());
     }
 
@@ -143,7 +144,7 @@ class AnswerUploadServiceTest {
         );
 
         assertSame(VoiceResponseCode.AUDIO_DURATION_INVALID, exception.getResponseCode());
-        verify(interviewAnswerApi, never()).createAnswer(any());
+        verify(interviewAnswerApi, never()).prepareAnswer(any());
         verify(audioStorage, never()).issueUploadUrl(any(), any());
     }
 
@@ -153,8 +154,8 @@ class AnswerUploadServiceTest {
         AnswerCreateRequest request = new AnswerCreateRequest(CONTENT_TYPE, DURATION_MS);
         RuntimeException storageFailure = new RuntimeException("storage failure");
         when(audioObjectKeyGenerator.generate(SESSION_ID, TURN_ID)).thenReturn(OBJECT_KEY);
-        when(interviewAnswerApi.createAnswer(any(AnswerCreateCommand.class)))
-                .thenReturn(new CreatedAnswer(ANSWER_ID));
+        when(interviewAnswerApi.prepareAnswer(any(AnswerCreateCommand.class)))
+                .thenReturn(new PreparedAnswer(ANSWER_ID, OBJECT_KEY, CONTENT_TYPE, true));
         when(audioStorage.issueUploadUrl(OBJECT_KEY, CONTENT_TYPE)).thenThrow(storageFailure);
 
         RuntimeException exception = assertThrows(
@@ -163,6 +164,33 @@ class AnswerUploadServiceTest {
         );
 
         assertSame(storageFailure, exception);
-        verify(interviewAnswerApi).createAnswer(any(AnswerCreateCommand.class));
+        verify(interviewAnswerApi).prepareAnswer(any(AnswerCreateCommand.class));
+    }
+
+    @Test
+    @DisplayName("기존 답변에는 저장된 객체 키로 업로드 URL을 재발급한다")
+    void shouldReissueUploadUrlForExistingAnswer() {
+        String unusedGeneratedKey = "interviews/10/turns/100/unused-new-key";
+        AnswerCreateRequest request = new AnswerCreateRequest(CONTENT_TYPE, DURATION_MS);
+        when(audioObjectKeyGenerator.generate(SESSION_ID, TURN_ID)).thenReturn(unusedGeneratedKey);
+        when(interviewAnswerApi.prepareAnswer(any(AnswerCreateCommand.class)))
+                .thenReturn(new PreparedAnswer(ANSWER_ID, OBJECT_KEY, CONTENT_TYPE, false));
+        when(audioStorage.issueUploadUrl(OBJECT_KEY, CONTENT_TYPE))
+                .thenReturn(new PresignedUpload(UPLOAD_URL, EXPIRES_AT));
+
+        AnswerCreateResponse response = answerUploadService.createUpload(
+                MEMBER_ID,
+                SESSION_ID,
+                TURN_ID,
+                request
+        );
+
+        assertAll(
+                () -> assertEquals(ANSWER_ID, response.answerId()),
+                () -> assertEquals(false, response.created()),
+                () -> assertEquals(UPLOAD_URL, response.uploadUrl())
+        );
+        verify(audioStorage).issueUploadUrl(OBJECT_KEY, CONTENT_TYPE);
+        verify(audioStorage, never()).issueUploadUrl(unusedGeneratedKey, CONTENT_TYPE);
     }
 }

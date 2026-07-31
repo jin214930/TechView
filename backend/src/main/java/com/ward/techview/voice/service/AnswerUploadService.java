@@ -2,8 +2,8 @@ package com.ward.techview.voice.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
-import com.ward.techview.interview.api.CreatedAnswer;
 import com.ward.techview.interview.api.InterviewAnswerApi;
+import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.voice.api.AudioStorage;
 import com.ward.techview.voice.api.PresignedUpload;
 import com.ward.techview.voice.domain.AudioObjectKeyGenerator;
@@ -33,7 +33,7 @@ public class AnswerUploadService {
 
         String objectKey = audioObjectKeyGenerator.generate(sessionId, turnId);
 
-        CreatedAnswer answer = interviewAnswerApi.createAnswer(
+        PreparedAnswer answer = interviewAnswerApi.prepareAnswer(
                 new AnswerCreateCommand(
                         memberId,
                         sessionId,
@@ -44,7 +44,10 @@ public class AnswerUploadService {
                 )
         );
 
-        PresignedUpload upload = audioStorage.issueUploadUrl(objectKey, request.audioContentType());
+        PresignedUpload upload = audioStorage.issueUploadUrl(
+                answer.audioObjectKey(),
+                answer.audioContentType()
+        );
 
         return AnswerCreateResponse.of(answer, upload);
     }

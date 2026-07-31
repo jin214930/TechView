@@ -109,7 +109,7 @@ class InterviewFlowIntegrationTests {
         long sessionId = JsonPath.<Number>read(startedBody, "$.data.sessionId").longValue();
         long turnId = JsonPath.<Number>read(startedBody, "$.data.turnId").longValue();
 
-        mockMvc.perform(post(
+        MvcResult createdAnswer = mockMvc.perform(post(
                         "/api/v1/interviews/{sessionId}/turns/{turnId}/answers",
                         sessionId,
                         turnId
@@ -119,11 +119,18 @@ class InterviewFlowIntegrationTests {
                         .content(answerRequest()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.created").value(true))
                 .andExpect(jsonPath("$.data.answerId").isNumber())
                 .andExpect(jsonPath("$.data.uploadUrl").value(
                         org.hamcrest.Matchers.startsWith("http://localhost:9000/techview-test-audio/")
                 ))
-                .andExpect(jsonPath("$.data.uploadExpiresAt").isNotEmpty());
+                .andExpect(jsonPath("$.data.uploadExpiresAt").isNotEmpty())
+                .andReturn();
+
+        long answerId = JsonPath.<Number>read(
+                createdAnswer.getResponse().getContentAsString(),
+                "$.data.answerId"
+        ).longValue();
 
         assertEquals(1, answerRepository.count());
 
@@ -135,16 +142,22 @@ class InterviewFlowIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(answerRequest()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(3005));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.created").value(false))
+                .andExpect(jsonPath("$.data.answerId").value(answerId))
+                .andExpect(jsonPath("$.data.uploadUrl").value(
+                        org.hamcrest.Matchers.startsWith("http://localhost:9000/techview-test-audio/")
+                ))
+                .andExpect(jsonPath("$.data.uploadExpiresAt").isNotEmpty());
 
         assertEquals(1, answerRepository.count());
     }
 
     @Test
     @Timeout(20)
-    @DisplayName("동일한 면접 턴의 동시 답변 생성 요청은 하나만 성공한다")
-    void shouldCreateOnlyOneAnswerForConcurrentRequests() throws Exception {
+    @DisplayName("동일한 면접 턴의 동시 요청은 답변 하나를 생성하고 같은 답변을 반환한다")
+    void shouldCreateOneAnswerAndReturnItForConcurrentRequests() throws Exception {
         MvcResult started = mockMvc.perform(post("/api/v1/interviews")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
                 .andExpect(status().isCreated())
@@ -186,8 +199,17 @@ class InterviewFlowIntegrationTests {
                     .sorted()
                     .toList();
 
-            assertEquals(List.of(201, 409), statuses);
+            assertEquals(List.of(200, 201), statuses);
             assertEquals(1, answerRepository.count());
+
+            List<Long> answerIds = results.stream()
+                    .map(result -> JsonPath.<Number>read(
+                            new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8),
+                            "$.data.answerId"
+                    ).longValue())
+                    .distinct()
+                    .toList();
+            assertEquals(1, answerIds.size());
         } finally {
             executor.shutdownNow();
         }

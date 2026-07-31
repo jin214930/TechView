@@ -25,6 +25,9 @@ public class AnswerUploadController {
             @Valid @RequestBody AnswerCreateRequest request
     ) {
         AnswerCreateResponse response = answerUploadService.createUpload(principal.id(), sessionId, turnId, request);
-        return ApiResponse.from(CommonResponseCode.CREATED, response);
+        CommonResponseCode responseCode = response.created()
+                ? CommonResponseCode.CREATED
+                : CommonResponseCode.SUCCESS;
+        return ApiResponse.from(responseCode, response);
     }
 }

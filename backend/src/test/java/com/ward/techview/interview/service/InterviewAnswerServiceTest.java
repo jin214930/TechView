@@ -2,7 +2,7 @@ package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
-import com.ward.techview.interview.api.CreatedAnswer;
+import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
 import com.ward.techview.interview.entity.InterviewSession;
@@ -66,16 +66,21 @@ class InterviewAnswerServiceTest {
                 .thenReturn(Optional.of(session));
         when(interviewTurnRepository.findByIdAndSessionId(TURN_ID, SESSION_ID))
                 .thenReturn(Optional.of(turn));
-        when(answerRepository.existsByInterviewTurnId(TURN_ID)).thenReturn(false);
+        when(answerRepository.findByInterviewTurnId(TURN_ID)).thenReturn(Optional.empty());
         when(answerRepository.save(any(Answer.class))).thenAnswer(invocation -> {
             Answer answer = invocation.getArgument(0);
             ReflectionTestUtils.setField(answer, "id", ANSWER_ID);
             return answer;
         });
 
-        CreatedAnswer result = interviewAnswerService.createAnswer(command());
+        PreparedAnswer result = interviewAnswerService.prepareAnswer(command());
 
-        assertEquals(ANSWER_ID, result.id());
+        assertAll(
+                () -> assertEquals(ANSWER_ID, result.id()),
+                () -> assertEquals(OBJECT_KEY, result.audioObjectKey()),
+                () -> assertEquals(CONTENT_TYPE, result.audioContentType()),
+                () -> assertEquals(true, result.created())
+        );
         ArgumentCaptor<Answer> answerCaptor = ArgumentCaptor.forClass(Answer.class);
         verify(answerRepository).save(answerCaptor.capture());
         Answer savedAnswer = answerCaptor.getValue();
@@ -95,7 +100,7 @@ class InterviewAnswerServiceTest {
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> interviewAnswerService.createAnswer(command())
+                () -> interviewAnswerService.prepareAnswer(command())
         );
 
         assertSame(InterviewResponseCode.INTERVIEW_NOT_FOUND, exception.getResponseCode());
@@ -112,7 +117,7 @@ class InterviewAnswerServiceTest {
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> interviewAnswerService.createAnswer(command())
+                () -> interviewAnswerService.prepareAnswer(command())
         );
 
         assertSame(InterviewResponseCode.INTERVIEW_NOT_IN_PROGRESS, exception.getResponseCode());
@@ -131,7 +136,7 @@ class InterviewAnswerServiceTest {
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> interviewAnswerService.createAnswer(command())
+                () -> interviewAnswerService.prepareAnswer(command())
         );
 
         assertSame(InterviewResponseCode.INTERVIEW_TURN_NOT_FOUND, exception.getResponseCode());
@@ -150,31 +155,67 @@ class InterviewAnswerServiceTest {
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> interviewAnswerService.createAnswer(command())
+                () -> interviewAnswerService.prepareAnswer(command())
         );
 
         assertSame(InterviewResponseCode.INTERVIEW_TURN_NOT_CURRENT, exception.getResponseCode());
-        verify(answerRepository, never()).existsByInterviewTurnId(any());
+        verify(answerRepository, never()).findByInterviewTurnId(any());
         verify(answerRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("현재 턴에 답변이 이미 있으면 중복 생성하지 않는다")
-    void shouldRejectWhenAnswerAlreadyExists() {
+    @DisplayName("현재 턴에 답변이 이미 있으면 기존 답변을 반환한다")
+    void shouldReturnExistingAnswerWhenAnswerAlreadyExists() {
         InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
         InterviewTurn turn = turn(session, 1);
+        Answer existingAnswer = Answer.create(turn, OBJECT_KEY, CONTENT_TYPE, DURATION_MS);
+        ReflectionTestUtils.setField(existingAnswer, "id", ANSWER_ID);
         when(interviewSessionRepository.findByIdAndMemberIdForUpdate(SESSION_ID, MEMBER_ID))
                 .thenReturn(Optional.of(session));
         when(interviewTurnRepository.findByIdAndSessionId(TURN_ID, SESSION_ID))
                 .thenReturn(Optional.of(turn));
-        when(answerRepository.existsByInterviewTurnId(TURN_ID)).thenReturn(true);
+        when(answerRepository.findByInterviewTurnId(TURN_ID)).thenReturn(Optional.of(existingAnswer));
+
+        PreparedAnswer result = interviewAnswerService.prepareAnswer(command());
+
+        assertAll(
+                () -> assertEquals(ANSWER_ID, result.id()),
+                () -> assertEquals(OBJECT_KEY, result.audioObjectKey()),
+                () -> assertEquals(CONTENT_TYPE, result.audioContentType()),
+                () -> assertEquals(false, result.created())
+        );
+
+        verify(answerRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("기존 답변과 음성 재생 시간이 다르면 URL을 재발급하지 않는다")
+    void shouldRejectWhenExistingAnswerMetadataDoesNotMatch() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
+        InterviewTurn turn = turn(session, 1);
+        Answer existingAnswer = Answer.create(turn, OBJECT_KEY, CONTENT_TYPE, DURATION_MS);
+        ReflectionTestUtils.setField(existingAnswer, "id", ANSWER_ID);
+        when(interviewSessionRepository.findByIdAndMemberIdForUpdate(SESSION_ID, MEMBER_ID))
+                .thenReturn(Optional.of(session));
+        when(interviewTurnRepository.findByIdAndSessionId(TURN_ID, SESSION_ID))
+                .thenReturn(Optional.of(turn));
+        when(answerRepository.findByInterviewTurnId(TURN_ID)).thenReturn(Optional.of(existingAnswer));
+
+        AnswerCreateCommand mismatchedCommand = new AnswerCreateCommand(
+                MEMBER_ID,
+                SESSION_ID,
+                TURN_ID,
+                "unused-new-object-key",
+                CONTENT_TYPE,
+                DURATION_MS + 1
+        );
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> interviewAnswerService.createAnswer(command())
+                () -> interviewAnswerService.prepareAnswer(mismatchedCommand)
         );
 
-        assertSame(InterviewResponseCode.ANSWER_ALREADY_EXISTS, exception.getResponseCode());
+        assertSame(InterviewResponseCode.ANSWER_UPLOAD_METADATA_MISMATCH, exception.getResponseCode());
         verify(answerRepository, never()).save(any());
     }
 

@@ -2,8 +2,8 @@ package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
-import com.ward.techview.interview.api.CreatedAnswer;
 import com.ward.techview.interview.api.InterviewAnswerApi;
+import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.entity.InterviewStatus;
@@ -25,7 +25,7 @@ public class InterviewAnswerService implements InterviewAnswerApi {
 
     @Override
     @Transactional
-    public CreatedAnswer createAnswer(AnswerCreateCommand command) {
+    public PreparedAnswer prepareAnswer(AnswerCreateCommand command) {
         InterviewSession session = interviewSessionRepository.findByIdAndMemberIdForUpdate(command.sessionId(), command.memberId())
                 .orElseThrow(() -> new BusinessException(InterviewResponseCode.INTERVIEW_NOT_FOUND));
 
@@ -35,12 +35,35 @@ public class InterviewAnswerService implements InterviewAnswerApi {
                 .orElseThrow(() -> new BusinessException(InterviewResponseCode.INTERVIEW_TURN_NOT_FOUND));
 
         validateCurrentTurn(session, turn);
-        validateAnswerNotExists(turn);
 
+        return answerRepository.findByInterviewTurnId(turn.getId())
+                .map(answer -> prepareExistingAnswer(answer, command))
+                .orElseGet(() -> createAnswer(turn, command));
+    }
+
+    private PreparedAnswer createAnswer(InterviewTurn turn, AnswerCreateCommand command) {
         Answer answer = Answer.create(turn, command.audioObjectKey(), command.audioContentType(), command.audioDurationMs());
         answerRepository.save(answer);
 
-        return new CreatedAnswer(answer.getId());
+        return toPreparedAnswer(answer, true);
+    }
+
+    private PreparedAnswer prepareExistingAnswer(Answer answer, AnswerCreateCommand command) {
+        if (!answer.getAudioContentType().equals(command.audioContentType())
+                || answer.getAudioDurationMs() != command.audioDurationMs()) {
+            throw new BusinessException(InterviewResponseCode.ANSWER_UPLOAD_METADATA_MISMATCH);
+        }
+
+        return toPreparedAnswer(answer, false);
+    }
+
+    private PreparedAnswer toPreparedAnswer(Answer answer, boolean created) {
+        return new PreparedAnswer(
+                answer.getId(),
+                answer.getAudioObjectKey(),
+                answer.getAudioContentType(),
+                created
+        );
     }
 
     private void validateInProgress(InterviewSession session) {
@@ -58,9 +81,4 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         }
     }
 
-    private void validateAnswerNotExists(InterviewTurn turn) {
-        if (answerRepository.existsByInterviewTurnId(turn.getId())) {
-            throw new BusinessException(InterviewResponseCode.ANSWER_ALREADY_EXISTS);
-        }
-    }
 }
