@@ -1,5 +1,5 @@
 @ApplicationModule(
-        allowedDependencies = {"account", "question"}
+        allowedDependencies = {"account", "question", "common"}
 )
 
 package com.ward.techview.interview;

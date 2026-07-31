@@ -1,0 +1,49 @@
+package com.ward.techview.interview.entity;
+
+import com.ward.techview.common.entity.BaseEntity;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.OffsetDateTime;
+import java.util.Objects;
+
+@Entity
+@Table(
+        name = "interview_session",
+        indexes = @Index(
+                name = "idx_interview_session_member_status_started_at",
+                columnList = "member_id, status, started_at"
+        )
+)
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class InterviewSession extends BaseEntity {
+    // DB FK ON DELETE CASCADE: 회원 탈퇴 시 면접 세션과 모든 하위 데이터를 함께 삭제한다.
+    @Column(nullable = false)
+    private Long memberId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private InterviewStatus status;
+
+    @Column(nullable = false)
+    private OffsetDateTime startedAt;
+
+    private OffsetDateTime completedAt;
+
+    @Column(nullable = false)
+    private int currentTurnOrder;
+
+    private InterviewSession(Long memberId, OffsetDateTime startedAt) {
+        this.memberId = Objects.requireNonNull(memberId, "회원 ID는 필수입니다.");
+        this.startedAt = Objects.requireNonNull(startedAt, "면접 시작 시각은 필수입니다.");
+        this.status = InterviewStatus.IN_PROGRESS;
+        this.currentTurnOrder = 1;
+    }
+
+    public static InterviewSession create(Long memberId, OffsetDateTime startedAt) {
+        return new InterviewSession(memberId, startedAt);
+    }
+}
