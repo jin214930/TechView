@@ -4,6 +4,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.ward.techview.account.member.entity.Member;
 import com.ward.techview.account.member.repository.MemberRepository;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
+import com.ward.techview.interview.repository.AnswerRepository;
 import com.ward.techview.interview.repository.InterviewCoreQuestionRepository;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -75,11 +77,15 @@ class InterviewFlowIntegrationTests {
     @Autowired
     private InterviewTurnRepository interviewTurnRepository;
 
+    @Autowired
+    private AnswerRepository answerRepository;
+
     private Long memberId;
     private String accessToken;
 
     @BeforeEach
     void setUp() {
+        answerRepository.deleteAllInBatch();
         interviewTurnRepository.deleteAllInBatch();
         interviewCoreQuestionRepository.deleteAllInBatch();
         interviewSessionRepository.deleteAllInBatch();
@@ -90,6 +96,101 @@ class InterviewFlowIntegrationTests {
         );
         memberId = member.getId();
         accessToken = accessToken(memberId);
+    }
+
+    @Test
+    @DisplayName("현재 면접 턴에 답변을 생성하고 Presigned 업로드 URL을 반환한다")
+    void shouldCreateAnswerAndReturnPresignedUploadUrl() throws Exception {
+        MvcResult started = mockMvc.perform(post("/api/v1/interviews")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String startedBody = started.getResponse().getContentAsString();
+        long sessionId = JsonPath.<Number>read(startedBody, "$.data.sessionId").longValue();
+        long turnId = JsonPath.<Number>read(startedBody, "$.data.turnId").longValue();
+
+        mockMvc.perform(post(
+                        "/api/v1/interviews/{sessionId}/turns/{turnId}/answers",
+                        sessionId,
+                        turnId
+                )
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(answerRequest()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.answerId").isNumber())
+                .andExpect(jsonPath("$.data.uploadUrl").value(
+                        org.hamcrest.Matchers.startsWith("http://localhost:9000/techview-test-audio/")
+                ))
+                .andExpect(jsonPath("$.data.uploadExpiresAt").isNotEmpty());
+
+        assertEquals(1, answerRepository.count());
+
+        mockMvc.perform(post(
+                        "/api/v1/interviews/{sessionId}/turns/{turnId}/answers",
+                        sessionId,
+                        turnId
+                )
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(answerRequest()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(3005));
+
+        assertEquals(1, answerRepository.count());
+    }
+
+    @Test
+    @Timeout(20)
+    @DisplayName("동일한 면접 턴의 동시 답변 생성 요청은 하나만 성공한다")
+    void shouldCreateOnlyOneAnswerForConcurrentRequests() throws Exception {
+        MvcResult started = mockMvc.perform(post("/api/v1/interviews")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String startedBody = started.getResponse().getContentAsString();
+        long sessionId = JsonPath.<Number>read(startedBody, "$.data.sessionId").longValue();
+        long turnId = JsonPath.<Number>read(startedBody, "$.data.turnId").longValue();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        Callable<MvcResult> answerRequest = () -> {
+            ready.countDown();
+            start.await();
+            return mockMvc.perform(post(
+                            "/api/v1/interviews/{sessionId}/turns/{turnId}/answers",
+                            sessionId,
+                            turnId
+                    )
+                            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(answerRequest()))
+                    .andReturn();
+        };
+
+        try {
+            Future<MvcResult> first = executor.submit(answerRequest);
+            Future<MvcResult> second = executor.submit(answerRequest);
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            List<MvcResult> results = List.of(
+                    first.get(10, TimeUnit.SECONDS),
+                    second.get(10, TimeUnit.SECONDS)
+            );
+            List<Integer> statuses = results.stream()
+                    .map(result -> result.getResponse().getStatus())
+                    .sorted()
+                    .toList();
+
+            assertEquals(List.of(201, 409), statuses);
+            assertEquals(1, answerRepository.count());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -217,5 +318,14 @@ class InterviewFlowIntegrationTests {
 
     private static String bearer(String token) {
         return "Bearer " + token;
+    }
+
+    private static String answerRequest() {
+        return """
+                {
+                  "audioContentType": "audio/webm",
+                  "audioDurationMs": 42000
+                }
+                """;
     }
 }
