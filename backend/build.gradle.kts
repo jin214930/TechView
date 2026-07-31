@@ -37,6 +37,8 @@ dependencies {
     implementation("org.springframework.modulith:spring-modulith-starter-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("io.jsonwebtoken:jjwt-api:0.13.0")
+    implementation(platform("software.amazon.awssdk:bom:2.47.6"))
+    implementation("software.amazon.awssdk:s3")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
     testImplementation("org.springframework.security:spring-security-test")
