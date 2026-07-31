@@ -1,4 +1,4 @@
-@ApplicationModule(allowedDependencies = {})
+@ApplicationModule(allowedDependencies = {"common"})
 
 package com.ward.techview.question;
 
