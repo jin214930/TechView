@@ -16,4 +16,6 @@ public interface InterviewTurnRepository extends JpaRepository<InterviewTurn, Lo
             WHERE turn.session.id = :sessionId AND turn.turnOrder = :turnOrder
             """)
     Optional<InterviewTurn> findCurrentTurn(@Param("sessionId") Long sessionId, @Param("turnOrder") int turnOrder);
+
+    Optional<InterviewTurn> findByIdAndSessionId(Long turnId, Long sessionId);
 }
