@@ -1,7 +1,7 @@
 package com.ward.techview.question;
 
 import com.ward.techview.question.dto.QuestionCandidate;
-import com.ward.techview.question.dto.SelectedQuestion;
+import com.ward.techview.question.api.SelectedQuestion;
 import com.ward.techview.question.entity.QuestionCategory;
 import com.ward.techview.question.repository.QuestionRepository;
 import com.ward.techview.question.service.QuestionService;
