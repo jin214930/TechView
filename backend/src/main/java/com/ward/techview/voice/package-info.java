@@ -1,5 +1,5 @@
 @ApplicationModule(
-        allowedDependencies = {"interview"}
+        allowedDependencies = {"common", "interview::api"}
 )
 
 package com.ward.techview.voice;

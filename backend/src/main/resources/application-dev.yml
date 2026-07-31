@@ -23,6 +23,16 @@ logging:
     com.ward.techview: DEBUG
     org.hibernate.SQL: DEBUG
 
+storage:
+  audio:
+    bucket: ${AUDIO_STORAGE_BUCKET:techview-audio}
+    region: ${AUDIO_STORAGE_REGION:ap-northeast-2}
+    endpoint: ${AUDIO_STORAGE_ENDPOINT:http://localhost:9000}
+    access-key: ${AUDIO_STORAGE_ACCESS_KEY:minioadmin}
+    secret-key: ${AUDIO_STORAGE_SECRET_KEY:minioadmin}
+    presigned-url-expiration: ${AUDIO_PRESIGNED_URL_EXPIRATION:5m}
+    path-style-access-enabled: ${AUDIO_STORAGE_PATH_STYLE_ACCESS_ENABLED:true}
+
 custom:
   cookie:
     token:

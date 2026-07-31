@@ -18,6 +18,13 @@ logging:
     com.ward.techview: INFO
     org.hibernate.SQL: OFF
 
+storage:
+  audio:
+    bucket: ${AUDIO_STORAGE_BUCKET}
+    region: ${AUDIO_STORAGE_REGION}
+    presigned-url-expiration: ${AUDIO_PRESIGNED_URL_EXPIRATION:5m}
+    path-style-access-enabled: ${AUDIO_STORAGE_PATH_STYLE_ACCESS_ENABLED:false}
+
 custom:
   cookie:
     token:

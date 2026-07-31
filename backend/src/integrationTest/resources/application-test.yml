@@ -7,6 +7,16 @@ spring:
     hibernate:
       ddl-auto: validate
 
+storage:
+  audio:
+    bucket: techview-test-audio
+    region: ap-northeast-2
+    endpoint: http://localhost:9000
+    access-key: test-access-key
+    secret-key: test-secret-key
+    presigned-url-expiration: 5m
+    path-style-access-enabled: true
+
 custom:
   cors:
     allowed-origin: http://localhost:3000
