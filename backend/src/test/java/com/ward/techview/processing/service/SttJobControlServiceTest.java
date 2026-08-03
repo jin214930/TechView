@@ -4,6 +4,7 @@ import com.ward.techview.processing.api.ClaimedSttJob;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
 import com.ward.techview.processing.entity.SttProcessingJob;
+import com.ward.techview.processing.entity.SttProcessingStage;
 import com.ward.techview.processing.repository.SttProcessingJobRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -75,6 +76,7 @@ class SttJobControlServiceTest {
                 () -> assertEquals(ANSWER_ID, claimedJob.answerId()),
                 () -> assertEquals(AUDIO_OBJECT_KEY, claimedJob.audioObjectKey()),
                 () -> assertEquals(SOURCE_OBJECT_ETAG, claimedJob.sourceObjectEtag()),
+                () -> assertFalse(claimedJob.cleanupPending()),
                 () -> assertEquals(1, claimedJob.attemptCount()),
                 () -> assertEquals(ProcessingJobStatus.PROCESSING, job.getStatus()),
                 () -> assertEquals(1, job.getAttemptCount()),
@@ -86,6 +88,76 @@ class SttJobControlServiceTest {
                 )
         );
         verify(sttProcessingJobRepository).findByIdForUpdate(PROCESSING_JOB_ID);
+    }
+
+    @Test
+    @DisplayName("현재 시도의 STT 작업을 음성 정리 단계로 전환한다")
+    void advancesCurrentAttemptToCleanup() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        SttProcessingJob job = createJob(now.minusMinutes(1));
+        job.claim(now, LEASE_DURATION);
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = sttJobControlService.advanceToCleanup(
+                PROCESSING_JOB_ID,
+                1
+        );
+
+        assertAll(
+                () -> assertTrue(result),
+                () -> assertEquals(
+                        SttProcessingStage.CLEANUP,
+                        job.getProcessingStage()
+                ),
+                () -> assertEquals(ProcessingJobStatus.PROCESSING, job.getStatus())
+        );
+    }
+
+    @Test
+    @DisplayName("정리 단계에서 재선점한 STT 작업은 정리 대기 정보를 반환한다")
+    void claimsCleanupPendingJob() {
+        OffsetDateTime firstAttemptAt = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(2);
+        OffsetDateTime secondAttemptAt = firstAttemptAt.plusMinutes(1);
+        SttProcessingJob job = createJob(firstAttemptAt);
+        job.claim(firstAttemptAt, LEASE_DURATION);
+        job.advanceToCleanup();
+        job.retry(secondAttemptAt, "AUDIO_CLEANUP_TIMEOUT", "음성 삭제 실패");
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        ClaimedSttJob claimedJob = sttJobControlService.claim(PROCESSING_JOB_ID)
+                .orElseThrow();
+
+        assertAll(
+                () -> assertTrue(claimedJob.cleanupPending()),
+                () -> assertEquals(2, claimedJob.attemptCount()),
+                () -> assertEquals(
+                        SttProcessingStage.CLEANUP,
+                        job.getProcessingStage()
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("오래된 시도는 STT 작업을 음성 정리 단계로 전환하지 못한다")
+    void ignoresStaleCleanupTransitionAttempt() {
+        SttProcessingJob job = createSecondAttemptJob();
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = sttJobControlService.advanceToCleanup(
+                PROCESSING_JOB_ID,
+                1
+        );
+
+        assertAll(
+                () -> assertFalse(result),
+                () -> assertEquals(
+                        SttProcessingStage.TRANSCRIPTION,
+                        job.getProcessingStage()
+                )
+        );
     }
 
     @Test

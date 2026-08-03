@@ -30,6 +30,7 @@ class SttCompletionServiceTest {
             20L,
             "interviews/10/answers/20/audio.webm",
             "verified-etag",
+            false,
             1
     );
     private static final TranscriptionResult RESULT =
@@ -45,18 +46,18 @@ class SttCompletionServiceTest {
     private SttCompletionService sttCompletionService;
 
     @Test
-    @DisplayName("답변에 전사 결과를 저장한 뒤 STT 작업을 성공 처리한다")
-    void completesAnswerBeforeSucceedingJob() {
-        when(sttJobControl.succeed(JOB.processingJobId(), JOB.attemptCount()))
+    @DisplayName("답변에 전사 결과를 저장한 뒤 STT 작업을 정리 단계로 전환한다")
+    void completesAnswerBeforeAdvancingJobToCleanup() {
+        when(sttJobControl.advanceToCleanup(JOB.processingJobId(), JOB.attemptCount()))
                 .thenReturn(true);
 
-        sttCompletionService.complete(JOB, RESULT);
+        sttCompletionService.completeTranscription(JOB, RESULT);
 
         ArgumentCaptor<AnswerTranscriptionCommand> commandCaptor =
                 ArgumentCaptor.forClass(AnswerTranscriptionCommand.class);
         InOrder order = inOrder(interviewAnswerApi, sttJobControl);
         order.verify(interviewAnswerApi).completeTranscription(commandCaptor.capture());
-        order.verify(sttJobControl).succeed(
+        order.verify(sttJobControl).advanceToCleanup(
                 JOB.processingJobId(),
                 JOB.attemptCount()
         );
@@ -71,12 +72,12 @@ class SttCompletionServiceTest {
     @Test
     @DisplayName("작업 처리 권한이 만료되면 예외를 발생시킨다")
     void throwsWhenJobAttemptIsNoLongerCurrent() {
-        when(sttJobControl.succeed(JOB.processingJobId(), JOB.attemptCount()))
+        when(sttJobControl.advanceToCleanup(JOB.processingJobId(), JOB.attemptCount()))
                 .thenReturn(false);
 
         assertThrows(
                 IllegalStateException.class,
-                () -> sttCompletionService.complete(JOB, RESULT)
+                () -> sttCompletionService.completeTranscription(JOB, RESULT)
         );
 
         verify(interviewAnswerApi).completeTranscription(

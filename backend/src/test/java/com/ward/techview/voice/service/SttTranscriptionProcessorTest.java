@@ -21,7 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -44,7 +43,17 @@ class SttTranscriptionProcessorTest {
             20L,
             AUDIO_OBJECT_KEY,
             SOURCE_OBJECT_ETAG,
+            false,
             1
+    );
+    private static final ClaimedSttJob CLEANUP_JOB = new ClaimedSttJob(
+            PROCESSING_JOB_ID,
+            10L,
+            20L,
+            AUDIO_OBJECT_KEY,
+            SOURCE_OBJECT_ETAG,
+            true,
+            2
     );
     private static final AudioObject AUDIO_OBJECT =
             new AudioObject(new byte[]{1, 2, 3}, "audio/webm");
@@ -83,7 +92,7 @@ class SttTranscriptionProcessorTest {
     }
 
     @Test
-    @DisplayName("음성을 전사하고 작업을 완료한 뒤 음성 객체를 삭제한다")
+    @DisplayName("음성을 전사하고 ETag가 일치하는 객체를 삭제한 뒤 작업을 완료한다")
     void processesClaimedJobSuccessfully() {
         prepareSuccessfulProcessing();
 
@@ -98,8 +107,9 @@ class SttTranscriptionProcessorTest {
         order.verify(sttJobControl).claim(PROCESSING_JOB_ID);
         order.verify(audioStorage).download(AUDIO_OBJECT_KEY, SOURCE_OBJECT_ETAG);
         order.verify(speechToTextProvider).transcribe(AUDIO_OBJECT);
-        order.verify(completionService).complete(JOB, RESULT);
-        order.verify(audioStorage).delete(AUDIO_OBJECT_KEY);
+        order.verify(completionService).completeTranscription(JOB, RESULT);
+        order.verify(audioStorage).delete(AUDIO_OBJECT_KEY, SOURCE_OBJECT_ETAG);
+        order.verify(sttJobControl).succeed(PROCESSING_JOB_ID, JOB.attemptCount());
     }
 
     @Test
@@ -196,19 +206,67 @@ class SttTranscriptionProcessorTest {
     }
 
     @Test
-    @DisplayName("전사 완료 후 음성 삭제가 실패해도 STT 작업을 다시 처리하지 않는다")
-    void ignoresAudioDeletionFailureAfterCompletion() {
+    @DisplayName("전사 완료 후 음성 삭제가 일시적으로 실패하면 정리 작업을 재시도한다")
+    void retriesTemporaryAudioDeletionFailure() {
         prepareSuccessfulProcessing();
         doThrow(storageException(
                         AudioStorageFailure.TEMPORARY_FAILURE,
                         "음성 객체를 삭제할 수 없습니다."
                 ))
                 .when(audioStorage)
-                .delete(AUDIO_OBJECT_KEY);
+                .delete(AUDIO_OBJECT_KEY, SOURCE_OBJECT_ETAG);
 
-        assertDoesNotThrow(() -> processor.process(PROCESSING_JOB_ID));
+        processor.process(PROCESSING_JOB_ID);
 
-        verify(completionService).complete(JOB, RESULT);
+        verify(completionService).completeTranscription(JOB, RESULT);
+        verify(sttJobControl).retry(
+                eq(PROCESSING_JOB_ID),
+                eq(JOB.attemptCount()),
+                any(OffsetDateTime.class),
+                eq("AUDIO_CLEANUP_TEMPORARY_FAILURE"),
+                eq("음성 객체를 삭제할 수 없습니다.")
+        );
+        verify(sttJobControl, never()).succeed(
+                any(), any(Integer.class)
+        );
+    }
+
+    @Test
+    @DisplayName("정리 단계의 재시도에서는 STT를 다시 호출하지 않고 음성만 삭제한다")
+    void retriesOnlyCleanupWhenTranscriptionIsAlreadyCompleted() {
+        when(sttJobControl.claim(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(CLEANUP_JOB));
+
+        processor.process(PROCESSING_JOB_ID);
+
+        verify(audioStorage).delete(AUDIO_OBJECT_KEY, SOURCE_OBJECT_ETAG);
+        verify(sttJobControl).succeed(
+                PROCESSING_JOB_ID,
+                CLEANUP_JOB.attemptCount()
+        );
+        verify(audioStorage, never()).download(any(), any());
+        verifyNoInteractions(speechToTextProvider, completionService);
+    }
+
+    @Test
+    @DisplayName("정리 대상 ETag가 달라졌으면 새 객체를 삭제하지 않고 작업을 완료한다")
+    void succeedsCleanupWithoutDeletingReplacementObject() {
+        AudioStorageException exception = storageException(
+                AudioStorageFailure.VERSION_MISMATCH,
+                "음성 객체 버전이 다릅니다."
+        );
+        when(sttJobControl.claim(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(CLEANUP_JOB));
+        doThrow(exception)
+                .when(audioStorage)
+                .delete(AUDIO_OBJECT_KEY, SOURCE_OBJECT_ETAG);
+
+        processor.process(PROCESSING_JOB_ID);
+
+        verify(sttJobControl).succeed(
+                PROCESSING_JOB_ID,
+                CLEANUP_JOB.attemptCount()
+        );
         verify(sttJobControl, never()).retry(
                 any(), any(Integer.class), any(), any(), any()
         );

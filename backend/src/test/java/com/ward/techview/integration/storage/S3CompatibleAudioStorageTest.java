@@ -247,9 +247,12 @@ class S3CompatibleAudioStorageTest {
     }
 
     @Test
-    @DisplayName("음성 객체 삭제 요청에 버킷과 객체 키를 전달한다")
+    @DisplayName("음성 객체 삭제 요청에 버킷과 객체 키 및 검증된 ETag를 전달한다")
     void shouldDeleteAudioObject() {
-        audioStorage.delete("interviews/10/turns/100/audio-key");
+        audioStorage.delete(
+                "interviews/10/turns/100/audio-key",
+                "verified-audio-etag"
+        );
 
         ArgumentCaptor<DeleteObjectRequest> requestCaptor =
                 ArgumentCaptor.forClass(DeleteObjectRequest.class);
@@ -260,7 +263,8 @@ class S3CompatibleAudioStorageTest {
                 () -> assertEquals(
                         "interviews/10/turns/100/audio-key",
                         request.key()
-                )
+                ),
+                () -> assertEquals("verified-audio-etag", request.ifMatch())
         );
     }
 
@@ -274,7 +278,8 @@ class S3CompatibleAudioStorageTest {
 
         assertDoesNotThrow(
                 () -> audioStorage.delete(
-                        "interviews/10/turns/100/missing-audio-key"
+                        "interviews/10/turns/100/missing-audio-key",
+                        "verified-audio-etag"
                 )
         );
     }
@@ -282,20 +287,34 @@ class S3CompatibleAudioStorageTest {
     @Test
     @DisplayName("음성 삭제의 일시적 저장소 오류를 재시도 가능한 오류로 변환한다")
     void shouldMapTemporaryFailureWhenDeletingAudioObject() {
+        assertDeleteFailure(503, AudioStorageFailure.TEMPORARY_FAILURE);
+    }
+
+    @Test
+    @DisplayName("음성 삭제 대상 ETag가 다르면 버전 불일치 오류로 변환한다")
+    void shouldMapVersionMismatchWhenDeletingAudioObject() {
+        assertDeleteFailure(412, AudioStorageFailure.VERSION_MISMATCH);
+    }
+
+    private void assertDeleteFailure(
+            int statusCode,
+            AudioStorageFailure expectedFailure
+    ) {
         S3Exception storageFailure = mock(S3Exception.class);
-        when(storageFailure.statusCode()).thenReturn(503);
+        when(storageFailure.statusCode()).thenReturn(statusCode);
         when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
                 .thenThrow(storageFailure);
 
         AudioStorageException exception = assertThrows(
                 AudioStorageException.class,
                 () -> audioStorage.delete(
-                        "interviews/10/turns/100/audio-key"
+                        "interviews/10/turns/100/audio-key",
+                        "verified-audio-etag"
                 )
         );
 
         assertAll(
-                () -> assertSame(AudioStorageFailure.TEMPORARY_FAILURE, exception.getFailure()),
+                () -> assertSame(expectedFailure, exception.getFailure()),
                 () -> assertSame(storageFailure, exception.getCause())
         );
     }
