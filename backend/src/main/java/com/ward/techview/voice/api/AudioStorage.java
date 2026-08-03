@@ -9,5 +9,5 @@ public interface AudioStorage {
 
     AudioObject download(String objectKey, String expectedEtag);
 
-    void delete(String objectKey);
+    void delete(String objectKey, String expectedEtag);
 }

@@ -90,10 +90,11 @@ public class S3CompatibleAudioStorage implements AudioStorage {
     }
 
     @Override
-    public void delete(String objectKey) {
+    public void delete(String objectKey, String expectedEtag) {
         DeleteObjectRequest request = DeleteObjectRequest.builder()
                 .bucket(properties.bucket())
                 .key(objectKey)
+                .ifMatch(expectedEtag)
                 .build();
 
         try {

@@ -29,25 +29,47 @@ public class SttTranscriptionProcessor {
     }
 
     private void processClaimedJob(ClaimedSttJob job) {
+        if (job.cleanupPending()) {
+            cleanupAudio(job);
+            return;
+        }
+
         try {
             AudioObject audioObject = audioStorage.download(job.audioObjectKey(), job.sourceObjectEtag());
 
             TranscriptionResult result = speechToTextProvider.transcribe(audioObject);
 
-            completionService.complete(job, result);
-            deleteAudio(job.audioObjectKey());
+            completionService.completeTranscription(job, result);
         } catch (AudioStorageException e) {
             handleStorageFailure(job, e);
+            return;
         } catch (SpeechToTextException e) {
             handleSttFailure(job, e);
+            return;
+        }
+
+        cleanupAudio(job);
+    }
+
+    private void cleanupAudio(ClaimedSttJob job) {
+        try {
+            audioStorage.delete(job.audioObjectKey(), job.sourceObjectEtag());
+            succeed(job);
+        } catch (AudioStorageException e) {
+            handleCleanupFailure(job, e);
         }
     }
 
-    private void deleteAudio(String objectKey) {
-        try {
-            audioStorage.delete(objectKey);
-        } catch (AudioStorageException e) {
-            log.warn("STT 완료 후 음성 객체를 삭제하지 못했습니다. objectKey={}", objectKey, e);
+    private void handleCleanupFailure(
+            ClaimedSttJob job,
+            AudioStorageException exception
+    ) {
+        String errorCode = "AUDIO_CLEANUP_" + exception.getFailure().name();
+
+        switch (exception.getFailure()) {
+            case TEMPORARY_FAILURE, UNKNOWN -> retry(job, errorCode, exception);
+            case ACCESS_DENIED -> fail(job, errorCode, exception);
+            case OBJECT_NOT_FOUND, VERSION_MISMATCH -> succeed(job);
         }
     }
 
@@ -114,6 +136,22 @@ public class SttTranscriptionProcessor {
         if (!updated) {
             log.info(
                     "이미 처리 권한이 만료된 STT 작업의 실패 요청을 무시합니다. " + "processingJobId={}, attemptCount={}",
+                    job.processingJobId(),
+                    job.attemptCount()
+            );
+        }
+    }
+
+    private void succeed(ClaimedSttJob job) {
+        boolean updated = sttJobControl.succeed(
+                job.processingJobId(),
+                job.attemptCount()
+        );
+
+        if (!updated) {
+            log.info(
+                    "이미 처리 권한이 만료된 STT 작업의 성공 요청을 무시합니다. " +
+                            "processingJobId={}, attemptCount={}",
                     job.processingJobId(),
                     job.attemptCount()
             );

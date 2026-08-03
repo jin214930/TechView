@@ -19,7 +19,7 @@ public class SttCompletionService {
     private final SttJobControl sttJobControl;
 
     @Transactional
-    public void complete(ClaimedSttJob job, TranscriptionResult result) {
+    public void completeTranscription(ClaimedSttJob job, TranscriptionResult result) {
         interviewAnswerApi.completeTranscription(
                 new AnswerTranscriptionCommand(
                         job.interviewSessionId(),
@@ -29,9 +29,12 @@ public class SttCompletionService {
                 )
         );
 
-        boolean succeeded = sttJobControl.succeed(job.processingJobId(), job.attemptCount());
+        boolean advanced = sttJobControl.advanceToCleanup(
+                job.processingJobId(),
+                job.attemptCount()
+        );
 
-        if (!succeeded) {
+        if (!advanced) {
             throw new IllegalStateException("STT 작업 처리 권한이 만료되었습니다.");
         }
     }

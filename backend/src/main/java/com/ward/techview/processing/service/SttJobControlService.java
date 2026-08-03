@@ -4,6 +4,7 @@ import com.ward.techview.processing.api.ClaimedSttJob;
 import com.ward.techview.processing.api.SttJobControl;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.SttProcessingJob;
+import com.ward.techview.processing.entity.SttProcessingStage;
 import com.ward.techview.processing.repository.SttProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,17 @@ public class SttJobControlService implements SttJobControl {
                 .findByIdForUpdate(processingJobId)
                 .filter(job -> job.isClaimable(now))
                 .map(job -> claim(job, now));
+    }
+
+    @Override
+    @Transactional
+    public boolean advanceToCleanup(Long processingJobId, int attemptCount) {
+        return findCurrentAttempt(processingJobId, attemptCount)
+                .map(job -> {
+                    job.advanceToCleanup();
+                    return true;
+                })
+                .orElse(false);
     }
 
     @Override
@@ -72,6 +84,7 @@ public class SttJobControlService implements SttJobControl {
                 job.getAnswerId(),
                 job.getAudioObjectKey(),
                 job.getSourceObjectEtag(),
+                job.getProcessingStage() == SttProcessingStage.CLEANUP,
                 job.getAttemptCount()
         );
     }

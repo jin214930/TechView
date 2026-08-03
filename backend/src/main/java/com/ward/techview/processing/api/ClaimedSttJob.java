@@ -6,6 +6,7 @@ public record ClaimedSttJob(
         Long answerId,
         String audioObjectKey,
         String sourceObjectEtag,
+        boolean cleanupPending,
         int attemptCount
 ) {
 }
