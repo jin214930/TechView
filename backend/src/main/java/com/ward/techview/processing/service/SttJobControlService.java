@@ -1,0 +1,45 @@
+package com.ward.techview.processing.service;
+
+import com.ward.techview.processing.api.ClaimedSttJob;
+import com.ward.techview.processing.api.SttJobControl;
+import com.ward.techview.processing.config.ProcessingWorkerProperties;
+import com.ward.techview.processing.entity.SttProcessingJob;
+import com.ward.techview.processing.repository.SttProcessingJobRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class SttJobControlService implements SttJobControl {
+    private final SttProcessingJobRepository sttProcessingJobRepository;
+    private final ProcessingWorkerProperties properties;
+
+    @Override
+    @Transactional
+    public Optional<ClaimedSttJob> claim(Long processingJobId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        return sttProcessingJobRepository
+                .findByIdForUpdate(processingJobId)
+                .filter(job -> job.isClaimable(now))
+                .map(job -> claim(job, now));
+    }
+
+    private ClaimedSttJob claim(SttProcessingJob job, OffsetDateTime now) {
+        job.claim(now, properties.leaseDuration());
+
+        return new ClaimedSttJob(
+                job.getId(),
+                job.getInterviewSessionId(),
+                job.getAnswerId(),
+                job.getAudioObjectKey(),
+                job.getSourceObjectEtag(),
+                job.getAttemptCount()
+        );
+    }
+}

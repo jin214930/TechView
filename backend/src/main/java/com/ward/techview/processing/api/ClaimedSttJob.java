@@ -1,0 +1,11 @@
+package com.ward.techview.processing.api;
+
+public record ClaimedSttJob(
+        Long processingJobId,
+        Long interviewSessionId,
+        Long answerId,
+        String audioObjectKey,
+        String sourceObjectEtag,
+        int attemptCount
+) {
+}

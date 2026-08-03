@@ -36,3 +36,6 @@ custom:
   voice:
     upload:
       max-file-size: ${AUDIO_MAX_FILE_SIZE:25MB}
+  processing:
+    worker:
+      lease-duration: ${PROCESSING_JOB_LEASE_DURATION:2m}
