@@ -39,6 +39,8 @@ custom:
   processing:
     worker:
       lease-duration: ${PROCESSING_JOB_LEASE_DURATION:2m}
+      concurrency: ${PROCESSING_WORKER_CONCURRENCY:2}
+      queue-capacity: ${PROCESSING_WORKER_QUEUE_CAPACITY:20}
   stt:
     openai:
       base-url: ${OPENAI_BASE_URL}
