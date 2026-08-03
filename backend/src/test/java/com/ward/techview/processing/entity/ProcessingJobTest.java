@@ -220,6 +220,31 @@ class ProcessingJobTest {
         );
     }
 
+    @Test
+    @DisplayName("처리 중인 작업의 현재 시도 번호가 일치하는지 확인한다")
+    void recognizesCurrentProcessingAttempt() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+
+        assertAll(
+                () -> assertTrue(job.isCurrentAttempt(1)),
+                () -> assertFalse(job.isCurrentAttempt(2))
+        );
+    }
+
+    @Test
+    @DisplayName("처리 중이 아닌 작업은 시도 번호가 같아도 현재 시도로 판단하지 않는다")
+    void rejectsAttemptWhenJobIsNotProcessing() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+
+        assertFalse(job.isCurrentAttempt(0));
+
+        job.claim(QUEUED_AT, LEASE_DURATION);
+        job.succeed();
+
+        assertFalse(job.isCurrentAttempt(1));
+    }
+
     private static SttProcessingJob createJob(OffsetDateTime queuedAt) {
         return SttProcessingJob.create(
                 SESSION_ID,

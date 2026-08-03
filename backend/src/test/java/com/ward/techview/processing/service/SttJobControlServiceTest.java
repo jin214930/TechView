@@ -21,6 +21,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -130,6 +131,149 @@ class SttJobControlServiceTest {
                 () -> assertEquals(1, job.getAttemptCount()),
                 () -> assertEquals(leaseExpiresAt, job.getLeaseExpiresAt())
         );
+    }
+
+    @Test
+    @DisplayName("현재 시도의 STT 작업을 성공 상태로 변경한다")
+    void succeedsCurrentAttempt() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        SttProcessingJob job = createJob(now.minusMinutes(1));
+        job.claim(now, LEASE_DURATION);
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = sttJobControlService.succeed(PROCESSING_JOB_ID, 1);
+
+        assertAll(
+                () -> assertTrue(result),
+                () -> assertEquals(ProcessingJobStatus.SUCCEEDED, job.getStatus()),
+                () -> assertNull(job.getLeaseExpiresAt())
+        );
+        verify(sttProcessingJobRepository).findByIdForUpdate(PROCESSING_JOB_ID);
+    }
+
+    @Test
+    @DisplayName("현재 시도의 STT 작업을 재시도 대기 상태로 변경한다")
+    void retriesCurrentAttempt() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime nextAttemptAt = now.plusMinutes(5);
+        SttProcessingJob job = createJob(now.minusMinutes(1));
+        job.claim(now, LEASE_DURATION);
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = sttJobControlService.retry(
+                PROCESSING_JOB_ID,
+                1,
+                nextAttemptAt,
+                "STT_TIMEOUT",
+                "STT 요청 시간이 초과되었습니다."
+        );
+
+        assertAll(
+                () -> assertTrue(result),
+                () -> assertEquals(ProcessingJobStatus.RETRY_WAIT, job.getStatus()),
+                () -> assertEquals(nextAttemptAt, job.getNextAttemptAt()),
+                () -> assertNull(job.getLeaseExpiresAt()),
+                () -> assertEquals("STT_TIMEOUT", job.getErrorCode()),
+                () -> assertEquals("STT 요청 시간이 초과되었습니다.", job.getErrorMessage())
+        );
+    }
+
+    @Test
+    @DisplayName("현재 시도의 STT 작업을 최종 실패 상태로 변경한다")
+    void failsCurrentAttempt() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        SttProcessingJob job = createJob(now.minusMinutes(1));
+        job.claim(now, LEASE_DURATION);
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = sttJobControlService.fail(
+                PROCESSING_JOB_ID,
+                1,
+                "INVALID_AUDIO",
+                "지원하지 않는 음성 파일입니다."
+        );
+
+        assertAll(
+                () -> assertTrue(result),
+                () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus()),
+                () -> assertNull(job.getLeaseExpiresAt()),
+                () -> assertEquals("INVALID_AUDIO", job.getErrorCode()),
+                () -> assertEquals("지원하지 않는 음성 파일입니다.", job.getErrorMessage())
+        );
+    }
+
+    @Test
+    @DisplayName("오래된 시도의 성공 요청은 현재 작업 상태를 변경하지 않는다")
+    void ignoresStaleSuccessAttempt() {
+        SttProcessingJob job = createSecondAttemptJob();
+        OffsetDateTime leaseExpiresAt = job.getLeaseExpiresAt();
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = sttJobControlService.succeed(PROCESSING_JOB_ID, 1);
+
+        assertAll(
+                () -> assertFalse(result),
+                () -> assertEquals(ProcessingJobStatus.PROCESSING, job.getStatus()),
+                () -> assertEquals(2, job.getAttemptCount()),
+                () -> assertEquals(leaseExpiresAt, job.getLeaseExpiresAt())
+        );
+    }
+
+    @Test
+    @DisplayName("오래된 시도의 재시도 요청은 현재 작업 상태를 변경하지 않는다")
+    void ignoresStaleRetryAttempt() {
+        SttProcessingJob job = createSecondAttemptJob();
+        OffsetDateTime leaseExpiresAt = job.getLeaseExpiresAt();
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = sttJobControlService.retry(
+                PROCESSING_JOB_ID,
+                1,
+                OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5),
+                "STT_TIMEOUT",
+                "오래된 작업의 실패"
+        );
+
+        assertAll(
+                () -> assertFalse(result),
+                () -> assertEquals(ProcessingJobStatus.PROCESSING, job.getStatus()),
+                () -> assertEquals(2, job.getAttemptCount()),
+                () -> assertEquals(leaseExpiresAt, job.getLeaseExpiresAt()),
+                () -> assertEquals("STT_TIMEOUT", job.getErrorCode()),
+                () -> assertEquals("첫 번째 실패", job.getErrorMessage())
+        );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 STT 작업의 상태 변경 요청은 실패 결과를 반환한다")
+    void returnsFalseWhenUpdatingMissingJob() {
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.empty());
+
+        boolean result = sttJobControlService.fail(
+                PROCESSING_JOB_ID,
+                1,
+                "STT_ERROR",
+                "STT 처리 실패"
+        );
+
+        assertFalse(result);
+        verify(sttProcessingJobRepository).findByIdForUpdate(PROCESSING_JOB_ID);
+    }
+
+    private static SttProcessingJob createSecondAttemptJob() {
+        OffsetDateTime firstAttemptAt = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(2);
+        OffsetDateTime secondAttemptAt = firstAttemptAt.plusMinutes(1);
+        SttProcessingJob job = createJob(firstAttemptAt);
+        job.claim(firstAttemptAt, LEASE_DURATION);
+        job.retry(secondAttemptAt, "STT_TIMEOUT", "첫 번째 실패");
+        job.claim(secondAttemptAt, LEASE_DURATION);
+        return job;
     }
 
     private static SttProcessingJob createJob(OffsetDateTime queuedAt) {
