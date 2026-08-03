@@ -172,6 +172,10 @@ public abstract class ProcessingJob extends BaseEntity {
         this.errorMessage = errorMessage;
     }
 
+    public boolean isCurrentAttempt(int expectedAttemptCount) {
+        return status == ProcessingJobStatus.PROCESSING && attemptCount == expectedAttemptCount;
+    }
+
     private void validateProcessing() {
         if (status != ProcessingJobStatus.PROCESSING) {
             throw new IllegalStateException("처리 중인 작업만 상태를 변경할 수 있습니다.");

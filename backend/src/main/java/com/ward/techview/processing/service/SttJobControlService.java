@@ -30,6 +30,39 @@ public class SttJobControlService implements SttJobControl {
                 .map(job -> claim(job, now));
     }
 
+    @Override
+    @Transactional
+    public boolean succeed(Long processingJobId, int attemptCount) {
+        return findCurrentAttempt(processingJobId, attemptCount)
+                .map(job -> {
+                    job.succeed();
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    @Override
+    @Transactional
+    public boolean retry(Long processingJobId, int attemptCount, OffsetDateTime nextAttemptAt, String errorCode, String errorMessage) {
+        return findCurrentAttempt(processingJobId, attemptCount)
+                .map(job -> {
+                    job.retry(nextAttemptAt, errorCode, errorMessage);
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    @Override
+    @Transactional
+    public boolean fail(Long processingJobId, int attemptCount, String errorCode, String errorMessage) {
+        return findCurrentAttempt(processingJobId, attemptCount)
+                .map(job -> {
+                    job.fail(errorCode, errorMessage);
+                    return true;
+                })
+                .orElse(false);
+    }
+
     private ClaimedSttJob claim(SttProcessingJob job, OffsetDateTime now) {
         job.claim(now, properties.leaseDuration());
 
@@ -41,5 +74,11 @@ public class SttJobControlService implements SttJobControl {
                 job.getSourceObjectEtag(),
                 job.getAttemptCount()
         );
+    }
+
+    private Optional<SttProcessingJob> findCurrentAttempt(Long processingJobId, int attemptCount) {
+        return sttProcessingJobRepository
+                .findByIdForUpdate(processingJobId)
+                .filter(job -> job.isCurrentAttempt(attemptCount));
     }
 }
