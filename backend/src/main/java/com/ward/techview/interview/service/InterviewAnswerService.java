@@ -2,6 +2,7 @@ package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
+import com.ward.techview.interview.api.AnswerInfo;
 import com.ward.techview.interview.api.InterviewAnswerApi;
 import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.interview.entity.Answer;
@@ -39,6 +40,20 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         return answerRepository.findByInterviewTurnId(turn.getId())
                 .map(answer -> prepareExistingAnswer(answer, command))
                 .orElseGet(() -> createAnswer(turn, command));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AnswerInfo getAnswer(Long memberId, Long answerId) {
+        Answer answer = answerRepository.findByIdAndMemberId(answerId, memberId)
+                .orElseThrow(() -> new BusinessException(InterviewResponseCode.ANSWER_NOT_FOUND));
+
+        return new AnswerInfo(
+                answer.getId(),
+                answer.getInterviewTurn().getSession().getId(),
+                answer.getAudioObjectKey(),
+                answer.getAudioContentType()
+        );
     }
 
     private PreparedAnswer createAnswer(InterviewTurn turn, AnswerCreateCommand command) {

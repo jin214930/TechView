@@ -33,3 +33,6 @@ custom:
       cleanup:
         cron: "0 0 3 * * *"
         time-zone: Asia/Seoul
+  voice:
+    upload:
+      max-file-size: ${AUDIO_MAX_FILE_SIZE:25MB}

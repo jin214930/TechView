@@ -1,5 +1,9 @@
 package com.ward.techview.voice.api;
 
+import java.util.Optional;
+
 public interface AudioStorage {
     PresignedUpload issueUploadUrl(String objectKey, String contentType);
+
+    Optional<AudioObjectMetadata> findMetadata(String objectKey);
 }
