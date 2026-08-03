@@ -58,7 +58,11 @@ public class S3CompatibleAudioStorage implements AudioStorage {
         try {
             HeadObjectResponse response = s3Client.headObject(request);
 
-            return Optional.of(new AudioObjectMetadata(response.contentType(), response.contentLength()));
+            return Optional.of(new AudioObjectMetadata(
+                    response.contentType(),
+                    response.contentLength(),
+                    response.eTag()
+            ));
         } catch (S3Exception e) {
             if (e.statusCode() == NOT_FOUND_STATUS_CODE) {
                 return Optional.empty();

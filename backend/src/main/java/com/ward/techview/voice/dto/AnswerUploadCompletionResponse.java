@@ -6,7 +6,7 @@ public record AnswerUploadCompletionResponse(
         Long answerId,
         Long processingJobId
 ) {
-    public static AnswerUploadCompletionResponse from(ProcessingJobReceipt job) {
-        return new AnswerUploadCompletionResponse(job.answerId(), job.processingJobId());
+    public static AnswerUploadCompletionResponse from(Long answerId, ProcessingJobReceipt job) {
+        return new AnswerUploadCompletionResponse(answerId, job.processingJobId());
     }
 }

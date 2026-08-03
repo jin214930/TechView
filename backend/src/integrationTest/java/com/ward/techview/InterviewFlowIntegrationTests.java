@@ -11,6 +11,7 @@ import com.ward.techview.interview.repository.InterviewTurnRepository;
 import com.ward.techview.processing.entity.ProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
 import com.ward.techview.processing.entity.ProcessingJobType;
+import com.ward.techview.processing.entity.SttProcessingJob;
 import com.ward.techview.processing.repository.ProcessingJobRepository;
 import com.ward.techview.voice.api.AudioObjectMetadata;
 import com.ward.techview.voice.api.AudioStorage;
@@ -50,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -136,12 +138,14 @@ class InterviewFlowIntegrationTests {
                 "$.data.processingJobId"
         ).longValue();
         ProcessingJob job = processingJobRepository.findById(processingJobId).orElseThrow();
+        SttProcessingJob sttJob = assertInstanceOf(SttProcessingJob.class, job);
 
         assertEquals(1, processingJobRepository.count());
         assertEquals(answer.sessionId(), job.getInterviewSessionId());
-        assertEquals(answer.answerId(), job.getAnswerId());
         assertEquals(ProcessingJobType.STT_TRANSCRIPTION, job.getJobType());
         assertEquals(ProcessingJobStatus.QUEUED, job.getStatus());
+        assertEquals(answer.answerId(), sttJob.getAnswerId());
+        assertEquals("verified-audio-etag", sttJob.getSourceObjectEtag());
     }
 
     @Test
@@ -478,7 +482,7 @@ class InterviewFlowIntegrationTests {
     }
 
     private static AudioObjectMetadata uploadedAudioMetadata() {
-        return new AudioObjectMetadata("audio/webm", 1_024L);
+        return new AudioObjectMetadata("audio/webm", 1_024L, "verified-audio-etag");
     }
 
     private static String answerRequest() {

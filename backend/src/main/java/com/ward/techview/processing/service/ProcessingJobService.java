@@ -3,9 +3,8 @@ package com.ward.techview.processing.service;
 import com.ward.techview.processing.api.ProcessingJobQueue;
 import com.ward.techview.processing.api.ProcessingJobReceipt;
 import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
-import com.ward.techview.processing.entity.ProcessingJob;
-import com.ward.techview.processing.entity.ProcessingJobType;
-import com.ward.techview.processing.repository.ProcessingJobRepository;
+import com.ward.techview.processing.entity.SttProcessingJob;
+import com.ward.techview.processing.repository.SttProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -19,46 +18,62 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class ProcessingJobService implements ProcessingJobQueue {
-    private final ProcessingJobRepository processingJobRepository;
+    private final SttProcessingJobRepository sttProcessingJobRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
     public Optional<ProcessingJobReceipt> findSttJob(Long answerId) {
-        return processingJobRepository.findByAnswerIdAndJobType(answerId, ProcessingJobType.STT_TRANSCRIPTION)
+        return sttProcessingJobRepository.findByAnswerId(answerId)
                 .map(this::toReceipt);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean hasSttJob(Long answerId) {
-        return processingJobRepository.existsByAnswerIdAndJobType(answerId, ProcessingJobType.STT_TRANSCRIPTION);
+        return sttProcessingJobRepository.existsByAnswerId(answerId);
     }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public ProcessingJobReceipt createOrGetSttJob(Long interviewSessionId, Long answerId) {
-        return processingJobRepository.findByAnswerIdAndJobType(answerId, ProcessingJobType.STT_TRANSCRIPTION)
+    public ProcessingJobReceipt createOrGetSttJob(
+            Long interviewSessionId,
+            Long answerId,
+            String audioObjectKey,
+            String sourceObjectEtag
+    ) {
+        return sttProcessingJobRepository.findByAnswerId(answerId)
                 .map(this::toReceipt)
-                .orElseGet(() -> createSttJob(interviewSessionId, answerId));
+                .orElseGet(() -> createSttJob(
+                        interviewSessionId,
+                        answerId,
+                        audioObjectKey,
+                        sourceObjectEtag
+                ));
     }
 
-    private ProcessingJobReceipt toReceipt(ProcessingJob job) {
+    private ProcessingJobReceipt toReceipt(SttProcessingJob job) {
         return new ProcessingJobReceipt(
                 job.getId(),
-                job.getInterviewSessionId(),
-                job.getAnswerId()
+                job.getInterviewSessionId()
         );
     }
 
-    private ProcessingJobReceipt createSttJob(Long interviewSessionId, Long answerId) {
-        ProcessingJob job = ProcessingJob.createSttTranscription(
+    private ProcessingJobReceipt createSttJob(
+            Long interviewSessionId,
+            Long answerId,
+            String audioObjectKey,
+            String sourceObjectEtag
+    ) {
+        SttProcessingJob job = SttProcessingJob.create(
                 interviewSessionId,
                 answerId,
+                audioObjectKey,
+                sourceObjectEtag,
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
 
-        processingJobRepository.save(job);
+        sttProcessingJobRepository.save(job);
 
         eventPublisher.publishEvent(new SttTranscriptionJobQueuedEvent(job.getId()));
 

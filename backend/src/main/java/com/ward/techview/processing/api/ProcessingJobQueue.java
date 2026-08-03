@@ -7,5 +7,10 @@ public interface ProcessingJobQueue {
 
     boolean hasSttJob(Long answerId);
 
-    ProcessingJobReceipt createOrGetSttJob(Long interviewSessionId, Long answerId);
+    ProcessingJobReceipt createOrGetSttJob(
+            Long interviewSessionId,
+            Long answerId,
+            String audioObjectKey,
+            String sourceObjectEtag
+    );
 }

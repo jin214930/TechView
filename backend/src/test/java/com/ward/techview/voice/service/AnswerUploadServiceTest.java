@@ -50,6 +50,7 @@ class AnswerUploadServiceTest {
     private static final Long ANSWER_ID = 1000L;
     private static final Long PROCESSING_JOB_ID = 2000L;
     private static final String CONTENT_TYPE = "audio/webm";
+    private static final String ETAG = "verified-audio-etag";
     private static final int DURATION_MS = 42_000;
     private static final String OBJECT_KEY = "interviews/10/turns/100/audio-key";
     private static final URI UPLOAD_URL = URI.create("http://localhost:9000/techview-audio/upload");
@@ -251,7 +252,7 @@ class AnswerUploadServiceTest {
                 () -> assertEquals(PROCESSING_JOB_ID, response.processingJobId())
         );
         verify(audioStorage, never()).findMetadata(any());
-        verify(sttJobRegistrationService, never()).register(any(), any());
+        verify(sttJobRegistrationService, never()).register(any(), any(), any());
     }
 
     @Test
@@ -268,7 +269,7 @@ class AnswerUploadServiceTest {
         );
 
         assertSame(VoiceResponseCode.AUDIO_OBJECT_NOT_FOUND, exception.getResponseCode());
-        verify(sttJobRegistrationService, never()).register(any(), any());
+        verify(sttJobRegistrationService, never()).register(any(), any(), any());
     }
 
     @Test
@@ -278,7 +279,7 @@ class AnswerUploadServiceTest {
         when(interviewAnswerApi.getAnswer(MEMBER_ID, ANSWER_ID)).thenReturn(answer);
         when(processingJobQueue.findSttJob(ANSWER_ID)).thenReturn(Optional.empty());
         when(audioStorage.findMetadata(OBJECT_KEY))
-                .thenReturn(Optional.of(new AudioObjectMetadata("audio/wav", 1_024L)));
+                .thenReturn(Optional.of(new AudioObjectMetadata("audio/wav", 1_024L, ETAG)));
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -286,7 +287,7 @@ class AnswerUploadServiceTest {
         );
 
         assertSame(VoiceResponseCode.AUDIO_CONTENT_TYPE_MISMATCH, exception.getResponseCode());
-        verify(sttJobRegistrationService, never()).register(any(), any());
+        verify(sttJobRegistrationService, never()).register(any(), any(), any());
     }
 
     @Test
@@ -296,7 +297,7 @@ class AnswerUploadServiceTest {
         when(interviewAnswerApi.getAnswer(MEMBER_ID, ANSWER_ID)).thenReturn(answer);
         when(processingJobQueue.findSttJob(ANSWER_ID)).thenReturn(Optional.empty());
         when(audioStorage.findMetadata(OBJECT_KEY))
-                .thenReturn(Optional.of(new AudioObjectMetadata(CONTENT_TYPE, 0L)));
+                .thenReturn(Optional.of(new AudioObjectMetadata(CONTENT_TYPE, 0L, ETAG)));
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -304,7 +305,7 @@ class AnswerUploadServiceTest {
         );
 
         assertSame(VoiceResponseCode.AUDIO_FILE_EMPTY, exception.getResponseCode());
-        verify(sttJobRegistrationService, never()).register(any(), any());
+        verify(sttJobRegistrationService, never()).register(any(), any(), any());
     }
 
     @Test
@@ -314,7 +315,7 @@ class AnswerUploadServiceTest {
         when(interviewAnswerApi.getAnswer(MEMBER_ID, ANSWER_ID)).thenReturn(answer);
         when(processingJobQueue.findSttJob(ANSWER_ID)).thenReturn(Optional.empty());
         when(audioStorage.findMetadata(OBJECT_KEY))
-                .thenReturn(Optional.of(new AudioObjectMetadata(CONTENT_TYPE, 1_025L)));
+                .thenReturn(Optional.of(new AudioObjectMetadata(CONTENT_TYPE, 1_025L, ETAG)));
         when(voiceUploadProperties.maxFileSize()).thenReturn(DataSize.ofBytes(1_024L));
 
         BusinessException exception = assertThrows(
@@ -323,7 +324,7 @@ class AnswerUploadServiceTest {
         );
 
         assertSame(VoiceResponseCode.AUDIO_FILE_SIZE_EXCEEDED, exception.getResponseCode());
-        verify(sttJobRegistrationService, never()).register(any(), any());
+        verify(sttJobRegistrationService, never()).register(any(), any(), any());
     }
 
     @Test
@@ -334,9 +335,9 @@ class AnswerUploadServiceTest {
         when(interviewAnswerApi.getAnswer(MEMBER_ID, ANSWER_ID)).thenReturn(answer);
         when(processingJobQueue.findSttJob(ANSWER_ID)).thenReturn(Optional.empty());
         when(audioStorage.findMetadata(OBJECT_KEY))
-                .thenReturn(Optional.of(new AudioObjectMetadata(CONTENT_TYPE, 1_024L)));
+                .thenReturn(Optional.of(new AudioObjectMetadata(CONTENT_TYPE, 1_024L, ETAG)));
         when(voiceUploadProperties.maxFileSize()).thenReturn(DataSize.ofMegabytes(25));
-        when(sttJobRegistrationService.register(MEMBER_ID, answer)).thenReturn(job);
+        when(sttJobRegistrationService.register(MEMBER_ID, answer, ETAG)).thenReturn(job);
 
         AnswerUploadCompletionResponse response =
                 answerUploadService.completeUpload(MEMBER_ID, ANSWER_ID);
@@ -345,7 +346,7 @@ class AnswerUploadServiceTest {
                 () -> assertEquals(ANSWER_ID, response.answerId()),
                 () -> assertEquals(PROCESSING_JOB_ID, response.processingJobId())
         );
-        verify(sttJobRegistrationService).register(MEMBER_ID, answer);
+        verify(sttJobRegistrationService).register(MEMBER_ID, answer, ETAG);
     }
 
     private static AnswerInfo answerInfo() {
@@ -360,8 +361,7 @@ class AnswerUploadServiceTest {
     private static ProcessingJobReceipt processingJobReceipt() {
         return new ProcessingJobReceipt(
                 PROCESSING_JOB_ID,
-                SESSION_ID,
-                ANSWER_ID
+                SESSION_ID
         );
     }
 }

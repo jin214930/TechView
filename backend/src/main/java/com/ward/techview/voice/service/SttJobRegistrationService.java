@@ -15,13 +15,22 @@ public class SttJobRegistrationService {
     private final ProcessingJobQueue processingJobQueue;
 
     @Transactional
-    public ProcessingJobReceipt register(Long memberId, AnswerInfo answer) {
+    public ProcessingJobReceipt register(
+            Long memberId,
+            AnswerInfo answer,
+            String sourceObjectEtag
+    ) {
         AnswerInfo lockedAnswer = interviewAnswerApi.lockAnswerForProcessing(
                 memberId,
                 answer.interviewSessionId(),
                 answer.answerId()
         );
 
-        return processingJobQueue.createOrGetSttJob(lockedAnswer.interviewSessionId(), lockedAnswer.answerId());
+        return processingJobQueue.createOrGetSttJob(
+                lockedAnswer.interviewSessionId(),
+                lockedAnswer.answerId(),
+                lockedAnswer.audioObjectKey(),
+                sourceObjectEtag
+        );
     }
 }

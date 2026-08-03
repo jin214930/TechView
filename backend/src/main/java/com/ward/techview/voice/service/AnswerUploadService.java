@@ -70,7 +70,7 @@ public class AnswerUploadService {
         AnswerInfo answer = interviewAnswerApi.getAnswer(memberId, answerId);
 
         return processingJobQueue.findSttJob(answerId)
-                .map(AnswerUploadCompletionResponse::from)
+                .map(job -> AnswerUploadCompletionResponse.from(answerId, job))
                 .orElseGet(() -> {
                     AudioObjectMetadata metadata = audioStorage
                             .findMetadata(answer.audioObjectKey())
@@ -82,9 +82,13 @@ public class AnswerUploadService {
 
                     validateUploadedObject(answer, metadata);
 
-                    ProcessingJobReceipt job = sttJobRegistrationService.register(memberId, answer);
+                    ProcessingJobReceipt job = sttJobRegistrationService.register(
+                            memberId,
+                            answer,
+                            metadata.etag()
+                    );
 
-                    return AnswerUploadCompletionResponse.from(job);
+                    return AnswerUploadCompletionResponse.from(answer.answerId(), job);
                 });
     }
 

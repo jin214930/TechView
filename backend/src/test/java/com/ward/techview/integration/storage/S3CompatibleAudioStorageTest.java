@@ -110,6 +110,7 @@ class S3CompatibleAudioStorageTest {
         HeadObjectResponse headObjectResponse = HeadObjectResponse.builder()
                 .contentType("audio/webm")
                 .contentLength(1_024L)
+                .eTag("verified-audio-etag")
                 .build();
         when(s3Client.headObject(any(HeadObjectRequest.class)))
                 .thenReturn(headObjectResponse);
@@ -121,7 +122,8 @@ class S3CompatibleAudioStorageTest {
         assertTrue(result.isPresent());
         assertAll(
                 () -> assertEquals("audio/webm", result.get().contentType()),
-                () -> assertEquals(1_024L, result.get().contentLength())
+                () -> assertEquals(1_024L, result.get().contentLength()),
+                () -> assertEquals("verified-audio-etag", result.get().etag())
         );
     }
 

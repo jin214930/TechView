@@ -23,6 +23,7 @@ class SttJobRegistrationServiceTest {
     private static final Long SESSION_ID = 10L;
     private static final Long ANSWER_ID = 1000L;
     private static final Long PROCESSING_JOB_ID = 2000L;
+    private static final String SOURCE_OBJECT_ETAG = "verified-audio-etag";
 
     @Mock
     private InterviewAnswerApi interviewAnswerApi;
@@ -44,19 +45,23 @@ class SttJobRegistrationServiceTest {
         );
         ProcessingJobReceipt expected = new ProcessingJobReceipt(
                 PROCESSING_JOB_ID,
-                SESSION_ID,
-                ANSWER_ID
+                SESSION_ID
         );
         when(interviewAnswerApi.lockAnswerForProcessing(
                 MEMBER_ID,
                 SESSION_ID,
                 ANSWER_ID
         )).thenReturn(answer);
-        when(processingJobQueue.createOrGetSttJob(SESSION_ID, ANSWER_ID))
+        when(processingJobQueue.createOrGetSttJob(
+                SESSION_ID,
+                ANSWER_ID,
+                answer.audioObjectKey(),
+                SOURCE_OBJECT_ETAG
+        ))
                 .thenReturn(expected);
 
         ProcessingJobReceipt result =
-                sttJobRegistrationService.register(MEMBER_ID, answer);
+                sttJobRegistrationService.register(MEMBER_ID, answer, SOURCE_OBJECT_ETAG);
 
         assertSame(expected, result);
         InOrder order = inOrder(interviewAnswerApi, processingJobQueue);
@@ -67,7 +72,9 @@ class SttJobRegistrationServiceTest {
         );
         order.verify(processingJobQueue).createOrGetSttJob(
                 SESSION_ID,
-                ANSWER_ID
+                ANSWER_ID,
+                answer.audioObjectKey(),
+                SOURCE_OBJECT_ETAG
         );
     }
 }
