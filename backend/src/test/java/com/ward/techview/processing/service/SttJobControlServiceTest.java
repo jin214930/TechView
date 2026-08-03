@@ -43,7 +43,11 @@ class SttJobControlServiceTest {
 
     @BeforeEach
     void setUp() {
-        ProcessingWorkerProperties properties = new ProcessingWorkerProperties(LEASE_DURATION);
+        ProcessingWorkerProperties properties = new ProcessingWorkerProperties(
+                LEASE_DURATION,
+                2,
+                20
+        );
         sttJobControlService = new SttJobControlService(
                 sttProcessingJobRepository,
                 properties
