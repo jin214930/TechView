@@ -6,4 +6,6 @@ public interface InterviewAnswerApi {
     AnswerInfo getAnswer(Long memberId, Long answerId);
 
     AnswerInfo lockAnswerForProcessing(Long memberId, Long interviewSessionId, Long answerId);
+
+    void completeTranscription(AnswerTranscriptionCommand command);
 }

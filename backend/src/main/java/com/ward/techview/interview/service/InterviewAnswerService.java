@@ -1,10 +1,7 @@
 package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
-import com.ward.techview.interview.api.AnswerCreateCommand;
-import com.ward.techview.interview.api.AnswerInfo;
-import com.ward.techview.interview.api.InterviewAnswerApi;
-import com.ward.techview.interview.api.PreparedAnswer;
+import com.ward.techview.interview.api.*;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.entity.InterviewStatus;
@@ -66,6 +63,15 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         validateCurrentTurn(session, answer.getInterviewTurn());
 
         return toAnswerInfo(answer);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void completeTranscription(AnswerTranscriptionCommand command) {
+        Answer answer = answerRepository.findByIdAndSessionIdForUpdate(command.answerId(), command.interviewSessionId())
+                .orElseThrow(() -> new BusinessException(InterviewResponseCode.ANSWER_NOT_FOUND));
+
+        answer.completeTranscription(command.transcript(), command.transcribedAt());
     }
 
     private PreparedAnswer createAnswer(InterviewTurn turn, AnswerCreateCommand command) {

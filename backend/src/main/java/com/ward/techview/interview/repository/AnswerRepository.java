@@ -1,7 +1,9 @@
 package com.ward.techview.interview.repository;
 
 import com.ward.techview.interview.entity.Answer;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -29,4 +31,15 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
               AND session.id = :sessionId
             """)
     Optional<Answer> findByIdAndSessionId(@Param("answerId") Long answerId, @Param("sessionId") Long sessionId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT answer
+            FROM Answer answer
+            JOIN answer.interviewTurn turn
+            JOIN turn.session session
+            WHERE answer.id = :answerId
+              AND session.id = :interviewSessionId
+            """)
+    Optional<Answer> findByIdAndSessionIdForUpdate(@Param("answerId") Long answerId, @Param("interviewSessionId") Long interviewSessionId);
 }

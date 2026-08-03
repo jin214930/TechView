@@ -47,4 +47,23 @@ public class Answer extends BaseEntity {
     public static Answer create(InterviewTurn interviewTurn, String audioObjectKey, String audioContentType, int audioDurationMs) {
         return new Answer(interviewTurn, audioObjectKey, audioContentType, audioDurationMs);
     }
+
+    public void completeTranscription(String transcript, OffsetDateTime transcribedAt) {
+        if (transcript == null || transcript.isBlank()) {
+            throw new IllegalArgumentException("전사문은 비어 있을 수 없습니다.");
+        }
+
+        Objects.requireNonNull(transcribedAt, "전사 완료 시각은 필수입니다.");
+
+        if (isTranscribed()) {
+            return;
+        }
+
+        this.transcript = transcript;
+        this.transcribedAt = transcribedAt;
+    }
+
+    public boolean isTranscribed() {
+        return transcript != null && transcribedAt != null;
+    }
 }
