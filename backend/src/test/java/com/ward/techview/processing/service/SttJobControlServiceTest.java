@@ -46,6 +46,8 @@ class SttJobControlServiceTest {
         ProcessingWorkerProperties properties = new ProcessingWorkerProperties(
                 LEASE_DURATION,
                 2,
+                20,
+                Duration.ofSeconds(10),
                 20
         );
         sttJobControlService = new SttJobControlService(
