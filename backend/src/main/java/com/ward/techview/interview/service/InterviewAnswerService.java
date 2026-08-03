@@ -2,6 +2,7 @@ package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
+import com.ward.techview.interview.api.AnswerInfo;
 import com.ward.techview.interview.api.InterviewAnswerApi;
 import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.interview.entity.Answer;
@@ -14,6 +15,7 @@ import com.ward.techview.interview.repository.InterviewTurnRepository;
 import com.ward.techview.interview.response.InterviewResponseCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -39,6 +41,31 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         return answerRepository.findByInterviewTurnId(turn.getId())
                 .map(answer -> prepareExistingAnswer(answer, command))
                 .orElseGet(() -> createAnswer(turn, command));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AnswerInfo getAnswer(Long memberId, Long answerId) {
+        Answer answer = answerRepository.findByIdAndMemberId(answerId, memberId)
+                .orElseThrow(() -> new BusinessException(InterviewResponseCode.ANSWER_NOT_FOUND));
+
+        return toAnswerInfo(answer);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AnswerInfo lockAnswerForProcessing(Long memberId, Long interviewSessionId, Long answerId) {
+        InterviewSession session = interviewSessionRepository.findByIdAndMemberIdForUpdate(interviewSessionId, memberId)
+                .orElseThrow(() -> new BusinessException(InterviewResponseCode.INTERVIEW_NOT_FOUND));
+
+        validateInProgress(session);
+
+        Answer answer = answerRepository.findByIdAndSessionId(answerId, session.getId())
+                .orElseThrow(() -> new BusinessException(InterviewResponseCode.ANSWER_NOT_FOUND));
+
+        validateCurrentTurn(session, answer.getInterviewTurn());
+
+        return toAnswerInfo(answer);
     }
 
     private PreparedAnswer createAnswer(InterviewTurn turn, AnswerCreateCommand command) {
@@ -81,4 +108,12 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         }
     }
 
+    private AnswerInfo toAnswerInfo(Answer answer) {
+        return new AnswerInfo(
+                answer.getId(),
+                answer.getInterviewTurn().getSession().getId(),
+                answer.getAudioObjectKey(),
+                answer.getAudioContentType()
+        );
+    }
 }

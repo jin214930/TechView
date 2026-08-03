@@ -9,6 +9,8 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
@@ -28,6 +30,24 @@ public class AudioStorageConfig {
                                 .pathStyleAccessEnabled(
                                         properties.pathStyleAccessEnabled()
                                 )
+                                .build()
+                );
+
+        if (properties.endpoint() != null) {
+            builder.endpointOverride(properties.endpoint());
+        }
+
+        return builder.build();
+    }
+
+    @Bean(destroyMethod = "close")
+    public S3Client s3Client(AudioStorageProperties properties) {
+        S3ClientBuilder builder = S3Client.builder()
+                .region(Region.of(properties.region()))
+                .credentialsProvider(credentialsProvider(properties))
+                .serviceConfiguration(
+                        S3Configuration.builder()
+                                .pathStyleAccessEnabled(properties.pathStyleAccessEnabled())
                                 .build()
                 );
 

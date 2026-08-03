@@ -2,6 +2,7 @@ package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
+import com.ward.techview.interview.api.AnswerInfo;
 import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
@@ -217,6 +218,89 @@ class InterviewAnswerServiceTest {
 
         assertSame(InterviewResponseCode.ANSWER_UPLOAD_METADATA_MISMATCH, exception.getResponseCode());
         verify(answerRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("회원 소유의 답변 정보를 조회한다")
+    void shouldGetOwnedAnswerInfo() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
+        InterviewTurn turn = turn(session, 1);
+        Answer answer = Answer.create(turn, OBJECT_KEY, CONTENT_TYPE, DURATION_MS);
+        ReflectionTestUtils.setField(answer, "id", ANSWER_ID);
+        when(answerRepository.findByIdAndMemberId(ANSWER_ID, MEMBER_ID))
+                .thenReturn(Optional.of(answer));
+
+        AnswerInfo result = interviewAnswerService.getAnswer(MEMBER_ID, ANSWER_ID);
+
+        assertAll(
+                () -> assertEquals(ANSWER_ID, result.answerId()),
+                () -> assertEquals(SESSION_ID, result.interviewSessionId()),
+                () -> assertEquals(OBJECT_KEY, result.audioObjectKey()),
+                () -> assertEquals(CONTENT_TYPE, result.audioContentType())
+        );
+    }
+
+    @Test
+    @DisplayName("회원 소유의 답변이 없으면 조회를 거부한다")
+    void shouldRejectWhenOwnedAnswerDoesNotExist() {
+        when(answerRepository.findByIdAndMemberId(ANSWER_ID, MEMBER_ID))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> interviewAnswerService.getAnswer(MEMBER_ID, ANSWER_ID)
+        );
+
+        assertSame(InterviewResponseCode.ANSWER_NOT_FOUND, exception.getResponseCode());
+    }
+
+    @Test
+    @DisplayName("면접 세션을 잠근 후 현재 턴의 답변 정보를 반환한다")
+    void shouldLockSessionAndReturnAnswerForProcessing() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
+        InterviewTurn turn = turn(session, 1);
+        Answer answer = Answer.create(turn, OBJECT_KEY, CONTENT_TYPE, DURATION_MS);
+        ReflectionTestUtils.setField(answer, "id", ANSWER_ID);
+        when(interviewSessionRepository.findByIdAndMemberIdForUpdate(
+                SESSION_ID,
+                MEMBER_ID
+        )).thenReturn(Optional.of(session));
+        when(answerRepository.findByIdAndSessionId(ANSWER_ID, SESSION_ID))
+                .thenReturn(Optional.of(answer));
+
+        AnswerInfo result = interviewAnswerService.lockAnswerForProcessing(
+                MEMBER_ID,
+                SESSION_ID,
+                ANSWER_ID
+        );
+
+        assertAll(
+                () -> assertEquals(ANSWER_ID, result.answerId()),
+                () -> assertEquals(SESSION_ID, result.interviewSessionId()),
+                () -> assertEquals(OBJECT_KEY, result.audioObjectKey()),
+                () -> assertEquals(CONTENT_TYPE, result.audioContentType())
+        );
+    }
+
+    @Test
+    @DisplayName("회원 소유의 면접 세션이 없으면 처리할 답변을 조회하지 않는다")
+    void shouldRejectProcessingWhenOwnedSessionDoesNotExist() {
+        when(interviewSessionRepository.findByIdAndMemberIdForUpdate(
+                SESSION_ID,
+                MEMBER_ID
+        )).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> interviewAnswerService.lockAnswerForProcessing(
+                        MEMBER_ID,
+                        SESSION_ID,
+                        ANSWER_ID
+                )
+        );
+
+        assertSame(InterviewResponseCode.INTERVIEW_NOT_FOUND, exception.getResponseCode());
+        verify(answerRepository, never()).findByIdAndSessionId(any(), any());
     }
 
     private static AnswerCreateCommand command() {
