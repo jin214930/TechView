@@ -36,3 +36,10 @@ custom:
   auth:
     refresh-token:
       hash-secret-key: TECHVIEW_REFRESH_TOKEN_HASH_SECRET_KEY_FOR_INTEGRATION_TESTS
+  stt:
+    openai:
+      base-url: http://localhost
+      api-key: test-openai-api-key
+      model: gpt-4o-mini-transcribe
+      language: ko
+      timeout: 1s
