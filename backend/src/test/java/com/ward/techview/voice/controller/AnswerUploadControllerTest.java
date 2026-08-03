@@ -6,6 +6,7 @@ import com.ward.techview.common.response.ApiResponseAdvice;
 import com.ward.techview.common.security.CustomUserDetails;
 import com.ward.techview.voice.dto.AnswerCreateRequest;
 import com.ward.techview.voice.dto.AnswerCreateResponse;
+import com.ward.techview.voice.dto.AnswerUploadCompletionResponse;
 import com.ward.techview.voice.response.VoiceResponseCode;
 import com.ward.techview.voice.service.AnswerUploadService;
 import org.junit.jupiter.api.AfterEach;
@@ -41,8 +42,11 @@ class AnswerUploadControllerTest {
     private static final Long SESSION_ID = 10L;
     private static final Long TURN_ID = 100L;
     private static final Long ANSWER_ID = 1000L;
+    private static final Long PROCESSING_JOB_ID = 2000L;
     private static final String ENDPOINT =
             "/api/v1/interviews/{sessionId}/turns/{turnId}/answers";
+    private static final String COMPLETION_ENDPOINT =
+            "/api/v1/answers/{answerId}/upload-completion";
     private static final CustomUserDetails PRINCIPAL =
             new CustomUserDetails(MEMBER_ID, "user@example.com");
 
@@ -190,5 +194,25 @@ class AnswerUploadControllerTest {
                                 """))
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.code").value(4000));
+    }
+    @Test
+    @DisplayName("음성 업로드 완료 요청을 접수하면 HTTP 202를 반환한다")
+    void shouldReturnAcceptedWhenAudioUploadCompletionIsAccepted() throws Exception {
+        AnswerUploadCompletionResponse response =
+                new AnswerUploadCompletionResponse(
+                        ANSWER_ID,
+                        PROCESSING_JOB_ID
+                );
+        when(answerUploadService.completeUpload(MEMBER_ID, ANSWER_ID))
+                .thenReturn(response);
+
+        mockMvc.perform(post(COMPLETION_ENDPOINT, ANSWER_ID))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.answerId").value(ANSWER_ID))
+                .andExpect(jsonPath("$.data.processingJobId")
+                        .value(PROCESSING_JOB_ID));
+
+        verify(answerUploadService).completeUpload(MEMBER_ID, ANSWER_ID);
     }
 }
