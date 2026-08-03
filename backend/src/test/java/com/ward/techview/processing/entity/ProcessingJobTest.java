@@ -1,0 +1,232 @@
+package com.ward.techview.processing.entity;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class ProcessingJobTest {
+
+    private static final Long SESSION_ID = 1L;
+    private static final Long ANSWER_ID = 10L;
+    private static final String AUDIO_OBJECT_KEY = "interviews/1/answers/10/audio.webm";
+    private static final String SOURCE_OBJECT_ETAG = "verified-etag";
+    private static final OffsetDateTime QUEUED_AT = OffsetDateTime.of(
+            2026,
+            8,
+            3,
+            12,
+            0,
+            0,
+            0,
+            ZoneOffset.UTC
+    );
+    private static final Duration LEASE_DURATION = Duration.ofMinutes(1);
+
+    @Test
+    @DisplayName("작업을 생성하면 대기 상태와 기본 시도 횟수가 설정된다")
+    void createsQueuedJob() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+
+        assertAll(
+                () -> assertEquals(ProcessingJobStatus.QUEUED, job.getStatus()),
+                () -> assertEquals(0, job.getAttemptCount()),
+                () -> assertEquals(3, job.getMaxAttempts()),
+                () -> assertEquals(QUEUED_AT, job.getNextAttemptAt()),
+                () -> assertNull(job.getLeaseExpiresAt()),
+                () -> assertNull(job.getErrorCode()),
+                () -> assertNull(job.getErrorMessage())
+        );
+    }
+
+    @Test
+    @DisplayName("실행 시각이 도래한 대기 작업을 선점한다")
+    void claimsQueuedJob() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+
+        job.claim(QUEUED_AT, LEASE_DURATION);
+
+        assertAll(
+                () -> assertEquals(ProcessingJobStatus.PROCESSING, job.getStatus()),
+                () -> assertEquals(1, job.getAttemptCount()),
+                () -> assertNull(job.getNextAttemptAt()),
+                () -> assertEquals(QUEUED_AT.plus(LEASE_DURATION), job.getLeaseExpiresAt())
+        );
+    }
+
+    @Test
+    @DisplayName("실행 예정 시각 전에는 대기 작업을 선점할 수 없다")
+    void rejectsClaimBeforeScheduledTime() {
+        SttProcessingJob job = createJob(QUEUED_AT.plusSeconds(1));
+
+        assertFalse(job.isClaimable(QUEUED_AT));
+        assertThrows(
+                IllegalStateException.class,
+                () -> job.claim(QUEUED_AT, LEASE_DURATION)
+        );
+    }
+
+    @Test
+    @DisplayName("lease가 유효한 처리 중 작업은 다시 선점할 수 없다")
+    void rejectsClaimWhileLeaseIsActive() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+
+        OffsetDateTime beforeLeaseExpiration = QUEUED_AT.plus(LEASE_DURATION).minusNanos(1);
+
+        assertFalse(job.isClaimable(beforeLeaseExpiration));
+        assertThrows(
+                IllegalStateException.class,
+                () -> job.claim(beforeLeaseExpiration, LEASE_DURATION)
+        );
+    }
+
+    @Test
+    @DisplayName("lease가 만료된 처리 중 작업은 다시 선점할 수 있다")
+    void reclaimsProcessingJobAfterLeaseExpiration() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+        OffsetDateTime leaseExpiredAt = QUEUED_AT.plus(LEASE_DURATION);
+
+        job.claim(leaseExpiredAt, LEASE_DURATION);
+
+        assertAll(
+                () -> assertEquals(ProcessingJobStatus.PROCESSING, job.getStatus()),
+                () -> assertEquals(2, job.getAttemptCount()),
+                () -> assertEquals(leaseExpiredAt.plus(LEASE_DURATION), job.getLeaseExpiresAt())
+        );
+    }
+
+    @Test
+    @DisplayName("처리 중 작업을 성공 상태로 변경한다")
+    void movesProcessingJobToSucceeded() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+
+        job.succeed();
+
+        assertAll(
+                () -> assertEquals(ProcessingJobStatus.SUCCEEDED, job.getStatus()),
+                () -> assertNull(job.getNextAttemptAt()),
+                () -> assertNull(job.getLeaseExpiresAt()),
+                () -> assertNull(job.getErrorCode()),
+                () -> assertNull(job.getErrorMessage()),
+                () -> assertFalse(job.isClaimable(QUEUED_AT.plusHours(1)))
+        );
+    }
+
+    @Test
+    @DisplayName("처리 중 작업에 재시도 시각과 실패 정보를 기록한다")
+    void movesProcessingJobToRetryWait() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+        OffsetDateTime nextAttemptAt = QUEUED_AT.plusMinutes(5);
+
+        job.retry(nextAttemptAt, "STT_TIMEOUT", "STT 요청 시간이 초과되었습니다.");
+
+        assertAll(
+                () -> assertEquals(ProcessingJobStatus.RETRY_WAIT, job.getStatus()),
+                () -> assertEquals(nextAttemptAt, job.getNextAttemptAt()),
+                () -> assertNull(job.getLeaseExpiresAt()),
+                () -> assertEquals("STT_TIMEOUT", job.getErrorCode()),
+                () -> assertEquals("STT 요청 시간이 초과되었습니다.", job.getErrorMessage()),
+                () -> assertFalse(job.isClaimable(nextAttemptAt.minusNanos(1))),
+                () -> assertTrue(job.isClaimable(nextAttemptAt))
+        );
+    }
+
+    @Test
+    @DisplayName("최대 시도 횟수에 도달하면 재시도 요청을 최종 실패로 변경한다")
+    void movesJobToFailedWhenMaxAttemptsReached() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        OffsetDateTime firstRetryAt = QUEUED_AT.plusMinutes(1);
+        OffsetDateTime secondRetryAt = QUEUED_AT.plusMinutes(2);
+
+        job.claim(QUEUED_AT, LEASE_DURATION);
+        job.retry(firstRetryAt, "STT_TIMEOUT", "첫 번째 실패");
+        job.claim(firstRetryAt, LEASE_DURATION);
+        job.retry(secondRetryAt, "STT_TIMEOUT", "두 번째 실패");
+        job.claim(secondRetryAt, LEASE_DURATION);
+        job.retry(secondRetryAt.plusMinutes(1), "STT_TIMEOUT", "세 번째 실패");
+
+        assertAll(
+                () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus()),
+                () -> assertEquals(3, job.getAttemptCount()),
+                () -> assertNull(job.getNextAttemptAt()),
+                () -> assertNull(job.getLeaseExpiresAt()),
+                () -> assertEquals("STT_TIMEOUT", job.getErrorCode()),
+                () -> assertEquals("세 번째 실패", job.getErrorMessage()),
+                () -> assertFalse(job.isClaimable(secondRetryAt.plusHours(1)))
+        );
+    }
+
+    @Test
+    @DisplayName("처리 중 작업을 즉시 최종 실패 상태로 변경한다")
+    void movesProcessingJobToFailed() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+
+        job.fail("INVALID_AUDIO", "지원하지 않는 음성 파일입니다.");
+
+        assertAll(
+                () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus()),
+                () -> assertNull(job.getNextAttemptAt()),
+                () -> assertNull(job.getLeaseExpiresAt()),
+                () -> assertEquals("INVALID_AUDIO", job.getErrorCode()),
+                () -> assertEquals("지원하지 않는 음성 파일입니다.", job.getErrorMessage())
+        );
+    }
+
+    @Test
+    @DisplayName("잘못된 재시도 정보는 예외를 발생시키고 처리 상태를 유지한다")
+    void rejectsInvalidRetryWithoutChangingState() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+        OffsetDateTime leaseExpiresAt = job.getLeaseExpiresAt();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> job.retry(QUEUED_AT.plusMinutes(1), " ", "일시적 실패")
+        );
+        assertAll(
+                () -> assertEquals(ProcessingJobStatus.PROCESSING, job.getStatus()),
+                () -> assertEquals(leaseExpiresAt, job.getLeaseExpiresAt()),
+                () -> assertNull(job.getNextAttemptAt()),
+                () -> assertNull(job.getErrorCode()),
+                () -> assertNull(job.getErrorMessage())
+        );
+    }
+
+    @Test
+    @DisplayName("처리 중이 아닌 작업은 성공이나 실패 상태로 변경할 수 없다")
+    void rejectsCompletionWhenJobIsNotProcessing() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+
+        assertAll(
+                () -> assertThrows(IllegalStateException.class, job::succeed),
+                () -> assertThrows(
+                        IllegalStateException.class,
+                        () -> job.fail("STT_ERROR", "STT 처리 실패")
+                )
+        );
+    }
+
+    private static SttProcessingJob createJob(OffsetDateTime queuedAt) {
+        return SttProcessingJob.create(
+                SESSION_ID,
+                ANSWER_ID,
+                AUDIO_OBJECT_KEY,
+                SOURCE_OBJECT_ETAG,
+                queuedAt
+        );
+    }
+}
