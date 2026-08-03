@@ -8,6 +8,12 @@ import com.ward.techview.interview.repository.AnswerRepository;
 import com.ward.techview.interview.repository.InterviewCoreQuestionRepository;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
+import com.ward.techview.processing.entity.ProcessingJob;
+import com.ward.techview.processing.entity.ProcessingJobStatus;
+import com.ward.techview.processing.entity.ProcessingJobType;
+import com.ward.techview.processing.repository.ProcessingJobRepository;
+import com.ward.techview.voice.api.AudioObjectMetadata;
+import com.ward.techview.voice.api.AudioStorage;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +27,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Container;
@@ -32,6 +39,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -43,6 +51,9 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -80,11 +91,18 @@ class InterviewFlowIntegrationTests {
     @Autowired
     private AnswerRepository answerRepository;
 
+    @Autowired
+    private ProcessingJobRepository processingJobRepository;
+
+    @MockitoSpyBean
+    private AudioStorage audioStorage;
+
     private Long memberId;
     private String accessToken;
 
     @BeforeEach
     void setUp() {
+        processingJobRepository.deleteAllInBatch();
         answerRepository.deleteAllInBatch();
         interviewTurnRepository.deleteAllInBatch();
         interviewCoreQuestionRepository.deleteAllInBatch();
@@ -96,6 +114,91 @@ class InterviewFlowIntegrationTests {
         );
         memberId = member.getId();
         accessToken = accessToken(memberId);
+    }
+
+    @Test
+    @DisplayName("답변 업로드 완료 요청은 STT 작업을 저장하고 접수 결과를 반환한다")
+    void shouldCreateSttJobWhenAnswerUploadIsCompleted() throws Exception {
+        CreatedAnswer answer = createAnswer();
+        doReturn(Optional.of(uploadedAudioMetadata()))
+                .when(audioStorage)
+                .findMetadata(anyString());
+
+        MvcResult completed = completeUpload(answer.answerId())
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.answerId").value(answer.answerId()))
+                .andExpect(jsonPath("$.data.processingJobId").isNumber())
+                .andReturn();
+
+        long processingJobId = JsonPath.<Number>read(
+                completed.getResponse().getContentAsString(),
+                "$.data.processingJobId"
+        ).longValue();
+        ProcessingJob job = processingJobRepository.findById(processingJobId).orElseThrow();
+
+        assertEquals(1, processingJobRepository.count());
+        assertEquals(answer.sessionId(), job.getInterviewSessionId());
+        assertEquals(answer.answerId(), job.getAnswerId());
+        assertEquals(ProcessingJobType.STT_TRANSCRIPTION, job.getJobType());
+        assertEquals(ProcessingJobStatus.QUEUED, job.getStatus());
+    }
+
+    @Test
+    @Timeout(20)
+    @DisplayName("동일 답변의 동시 업로드 완료 요청은 STT 작업 하나만 생성한다")
+    void shouldCreateOneSttJobForConcurrentUploadCompletionRequests() throws Exception {
+        CreatedAnswer answer = createAnswer();
+        CountDownLatch metadataRequests = new CountDownLatch(2);
+        CountDownLatch releaseMetadata = new CountDownLatch(1);
+
+        doAnswer(invocation -> {
+            metadataRequests.countDown();
+            if (!releaseMetadata.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("음성 메타데이터 조회 대기 시간이 초과되었습니다.");
+            }
+            return Optional.of(uploadedAudioMetadata());
+        }).when(audioStorage).findMetadata(anyString());
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<MvcResult> first = executor.submit(() -> completeUpload(answer.answerId()).andReturn());
+            Future<MvcResult> second = executor.submit(() -> completeUpload(answer.answerId()).andReturn());
+
+            assertTrue(metadataRequests.await(5, TimeUnit.SECONDS));
+            releaseMetadata.countDown();
+
+            List<MvcResult> results = List.of(
+                    first.get(10, TimeUnit.SECONDS),
+                    second.get(10, TimeUnit.SECONDS)
+            );
+
+            assertEquals(
+                    List.of(202, 202),
+                    results.stream()
+                            .map(result -> result.getResponse().getStatus())
+                            .sorted()
+                            .toList()
+            );
+            assertEquals(1, processingJobRepository.count());
+            assertEquals(
+                    1,
+                    results.stream()
+                            .map(result -> JsonPath.<Number>read(
+                                    new String(
+                                            result.getResponse().getContentAsByteArray(),
+                                            StandardCharsets.UTF_8
+                                    ),
+                                    "$.data.processingJobId"
+                            ).longValue())
+                            .distinct()
+                            .count()
+            );
+        } finally {
+            releaseMetadata.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -342,6 +445,42 @@ class InterviewFlowIntegrationTests {
         return "Bearer " + token;
     }
 
+    private CreatedAnswer createAnswer() throws Exception {
+        MvcResult started = mockMvc.perform(post("/api/v1/interviews")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String startedBody = started.getResponse().getContentAsString();
+        long sessionId = JsonPath.<Number>read(startedBody, "$.data.sessionId").longValue();
+        long turnId = JsonPath.<Number>read(startedBody, "$.data.turnId").longValue();
+
+        MvcResult createdAnswer = mockMvc.perform(post(
+                        "/api/v1/interviews/{sessionId}/turns/{turnId}/answers",
+                        sessionId,
+                        turnId
+                )
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(answerRequest()))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long answerId = JsonPath.<Number>read(
+                createdAnswer.getResponse().getContentAsString(),
+                "$.data.answerId"
+        ).longValue();
+
+        return new CreatedAnswer(sessionId, answerId);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions completeUpload(Long answerId) throws Exception {
+        return mockMvc.perform(post("/api/v1/answers/{answerId}/upload-completion", answerId)
+                .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)));
+    }
+
+    private static AudioObjectMetadata uploadedAudioMetadata() {
+        return new AudioObjectMetadata("audio/webm", 1_024L);
+    }
+
     private static String answerRequest() {
         return """
                 {
@@ -349,5 +488,11 @@ class InterviewFlowIntegrationTests {
                   "audioDurationMs": 42000
                 }
                 """;
+    }
+
+    private record CreatedAnswer(
+            Long sessionId,
+            Long answerId
+    ) {
     }
 }
