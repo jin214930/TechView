@@ -36,3 +36,17 @@ custom:
   voice:
     upload:
       max-file-size: ${AUDIO_MAX_FILE_SIZE:25MB}
+  processing:
+    worker:
+      lease-duration: ${PROCESSING_JOB_LEASE_DURATION:2m}
+      concurrency: ${PROCESSING_WORKER_CONCURRENCY:2}
+      queue-capacity: ${PROCESSING_WORKER_QUEUE_CAPACITY:20}
+      polling-delay: ${PROCESSING_WORKER_POLLING_DELAY:10s}
+      polling-batch-size: ${PROCESSING_WORKER_POLLING_BATCH_SIZE:20}
+  stt:
+    openai:
+      base-url: ${OPENAI_BASE_URL}
+      api-key: ${OPENAI_API_KEY}
+      model: ${OPENAI_STT_MODEL}
+      language: ${OPENAI_STT_LANGUAGE}
+      timeout: ${OPENAI_STT_TIMEOUT}

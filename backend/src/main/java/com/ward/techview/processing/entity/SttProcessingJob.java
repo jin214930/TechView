@@ -40,6 +40,10 @@ public class SttProcessingJob extends ProcessingJob {
     @Column(nullable = false, length = 255)
     private String sourceObjectEtag;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SttProcessingStage processingStage;
+
     private SttProcessingJob(
             Long interviewSessionId,
             Long answerId,
@@ -54,6 +58,7 @@ public class SttProcessingJob extends ProcessingJob {
                 sourceObjectEtag,
                 "STT 작업에는 검증된 음성 객체 ETag가 필요합니다."
         );
+        this.processingStage = SttProcessingStage.TRANSCRIPTION;
     }
 
     public static SttProcessingJob create(
@@ -75,5 +80,17 @@ public class SttProcessingJob extends ProcessingJob {
     @Override
     public ProcessingJobType getJobType() {
         return ProcessingJobType.STT_TRANSCRIPTION;
+    }
+
+    public void advanceToCleanup() {
+        if (getStatus() != ProcessingJobStatus.PROCESSING) {
+            throw new IllegalStateException("처리 중인 STT 작업만 정리 단계로 전환할 수 있습니다.");
+        }
+
+        if (processingStage != SttProcessingStage.TRANSCRIPTION) {
+            throw new IllegalStateException("전사 단계의 STT 작업만 정리 단계로 전환할 수 있습니다.");
+        }
+
+        processingStage = SttProcessingStage.CLEANUP;
     }
 }

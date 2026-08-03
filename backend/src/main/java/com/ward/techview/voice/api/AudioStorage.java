@@ -6,4 +6,8 @@ public interface AudioStorage {
     PresignedUpload issueUploadUrl(String objectKey, String contentType);
 
     Optional<AudioObjectMetadata> findMetadata(String objectKey);
+
+    AudioObject download(String objectKey, String expectedEtag);
+
+    void delete(String objectKey, String expectedEtag);
 }

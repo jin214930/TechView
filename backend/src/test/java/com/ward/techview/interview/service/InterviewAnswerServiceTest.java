@@ -3,6 +3,7 @@ package com.ward.techview.interview.service;
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
 import com.ward.techview.interview.api.AnswerInfo;
+import com.ward.techview.interview.api.AnswerTranscriptionCommand;
 import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
@@ -301,6 +302,56 @@ class InterviewAnswerServiceTest {
 
         assertSame(InterviewResponseCode.INTERVIEW_NOT_FOUND, exception.getResponseCode());
         verify(answerRepository, never()).findByIdAndSessionId(any(), any());
+    }
+
+    @Test
+    @DisplayName("답변을 잠그고 STT 전사 결과를 저장한다")
+    void shouldCompleteAnswerTranscription() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
+        InterviewTurn turn = turn(session, 1);
+        Answer answer = Answer.create(turn, OBJECT_KEY, CONTENT_TYPE, DURATION_MS);
+        OffsetDateTime transcribedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        when(answerRepository.findByIdAndSessionIdForUpdate(ANSWER_ID, SESSION_ID))
+                .thenReturn(Optional.of(answer));
+
+        interviewAnswerService.completeTranscription(
+                new AnswerTranscriptionCommand(
+                        SESSION_ID,
+                        ANSWER_ID,
+                        "스프링 빈의 의존 관계는 컨테이너가 주입합니다.",
+                        transcribedAt
+                )
+        );
+
+        assertAll(
+                () -> assertEquals(
+                        "스프링 빈의 의존 관계는 컨테이너가 주입합니다.",
+                        answer.getTranscript()
+                ),
+                () -> assertEquals(transcribedAt, answer.getTranscribedAt())
+        );
+        verify(answerRepository).findByIdAndSessionIdForUpdate(ANSWER_ID, SESSION_ID);
+    }
+
+    @Test
+    @DisplayName("작업의 면접 세션에 속한 답변이 없으면 전사 결과를 저장하지 않는다")
+    void shouldRejectTranscriptionWhenAnswerDoesNotExistInSession() {
+        when(answerRepository.findByIdAndSessionIdForUpdate(ANSWER_ID, SESSION_ID))
+                .thenReturn(Optional.empty());
+        AnswerTranscriptionCommand command = new AnswerTranscriptionCommand(
+                SESSION_ID,
+                ANSWER_ID,
+                "전사 결과",
+                OffsetDateTime.now(ZoneOffset.UTC)
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> interviewAnswerService.completeTranscription(command)
+        );
+
+        assertSame(InterviewResponseCode.ANSWER_NOT_FOUND, exception.getResponseCode());
+        verify(answerRepository).findByIdAndSessionIdForUpdate(ANSWER_ID, SESSION_ID);
     }
 
     private static AnswerCreateCommand command() {
