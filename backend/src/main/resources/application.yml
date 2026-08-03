@@ -41,6 +41,8 @@ custom:
       lease-duration: ${PROCESSING_JOB_LEASE_DURATION:2m}
       concurrency: ${PROCESSING_WORKER_CONCURRENCY:2}
       queue-capacity: ${PROCESSING_WORKER_QUEUE_CAPACITY:20}
+      polling-delay: ${PROCESSING_WORKER_POLLING_DELAY:10s}
+      polling-batch-size: ${PROCESSING_WORKER_POLLING_BATCH_SIZE:20}
   stt:
     openai:
       base-url: ${OPENAI_BASE_URL}

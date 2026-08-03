@@ -20,6 +20,10 @@ import java.util.Objects;
                 @Index(
                         name = "idx_processing_job_status_next_attempt_at",
                         columnList = "status, next_attempt_at"
+                ),
+                @Index(
+                        name = "idx_processing_job_status_lease_expires_at",
+                        columnList = "status, lease_expires_at"
                 )
         },
         check = {
