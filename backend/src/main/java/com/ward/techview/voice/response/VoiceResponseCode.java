@@ -14,7 +14,8 @@ public enum VoiceResponseCode implements ResponseCode {
     AUDIO_OBJECT_NOT_FOUND(4002, HttpStatus.CONFLICT, "업로드된 음성 파일을 찾을 수 없습니다."),
     AUDIO_CONTENT_TYPE_MISMATCH(4003, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "업로드된 음성 형식이 요청 정보와 일치하지 않습니다."),
     AUDIO_FILE_EMPTY(4004, HttpStatus.BAD_REQUEST, "업로드된 음성 파일이 비어 있습니다."),
-    AUDIO_FILE_SIZE_EXCEEDED(4005, HttpStatus.CONTENT_TOO_LARGE, "업로드된 음성 파일이 허용 크기를 초과했습니다.");
+    AUDIO_FILE_SIZE_EXCEEDED(4005, HttpStatus.CONTENT_TOO_LARGE, "업로드된 음성 파일이 허용 크기를 초과했습니다."),
+    ANSWER_ALREADY_SUBMITTED(4006, HttpStatus.CONFLICT, "이미 제출된 음성 답변입니다.");
 
     private final int code;
     private final HttpStatus httpStatus;

@@ -2,13 +2,19 @@ package com.ward.techview.voice.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.AnswerCreateCommand;
+import com.ward.techview.interview.api.AnswerInfo;
 import com.ward.techview.interview.api.InterviewAnswerApi;
 import com.ward.techview.interview.api.PreparedAnswer;
+import com.ward.techview.processing.api.ProcessingJobQueue;
+import com.ward.techview.processing.api.ProcessingJobReceipt;
+import com.ward.techview.voice.api.AudioObjectMetadata;
 import com.ward.techview.voice.api.AudioStorage;
 import com.ward.techview.voice.api.PresignedUpload;
+import com.ward.techview.voice.config.VoiceUploadProperties;
 import com.ward.techview.voice.domain.AudioObjectKeyGenerator;
 import com.ward.techview.voice.dto.AnswerCreateRequest;
 import com.ward.techview.voice.dto.AnswerCreateResponse;
+import com.ward.techview.voice.dto.AnswerUploadCompletionResponse;
 import com.ward.techview.voice.response.VoiceResponseCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +31,9 @@ public class AnswerUploadService {
     private final InterviewAnswerApi interviewAnswerApi;
     private final AudioObjectKeyGenerator audioObjectKeyGenerator;
     private final AudioStorage audioStorage;
+    private final VoiceUploadProperties voiceUploadProperties;
+    private final SttJobRegistrationService sttJobRegistrationService;
+    private final ProcessingJobQueue processingJobQueue;
 
     @Transactional
     public AnswerCreateResponse createUpload(Long memberId, Long sessionId, Long turnId, AnswerCreateRequest request) {
@@ -44,12 +53,39 @@ public class AnswerUploadService {
                 )
         );
 
+        if (processingJobQueue.hasSttJob(answer.id())) {
+            throw new BusinessException(VoiceResponseCode.ANSWER_ALREADY_SUBMITTED);
+        }
+
         PresignedUpload upload = audioStorage.issueUploadUrl(
                 answer.audioObjectKey(),
                 answer.audioContentType()
         );
 
         return AnswerCreateResponse.of(answer, upload);
+    }
+
+
+    public AnswerUploadCompletionResponse completeUpload(Long memberId, Long answerId) {
+        AnswerInfo answer = interviewAnswerApi.getAnswer(memberId, answerId);
+
+        return processingJobQueue.findSttJob(answerId)
+                .map(AnswerUploadCompletionResponse::from)
+                .orElseGet(() -> {
+                    AudioObjectMetadata metadata = audioStorage
+                            .findMetadata(answer.audioObjectKey())
+                            .orElseThrow(() ->
+                                    new BusinessException(
+                                            VoiceResponseCode.AUDIO_OBJECT_NOT_FOUND
+                                    )
+                            );
+
+                    validateUploadedObject(answer, metadata);
+
+                    ProcessingJobReceipt job = sttJobRegistrationService.register(memberId, answer);
+
+                    return AnswerUploadCompletionResponse.from(job);
+                });
     }
 
     private void validateContentType(String contentType) {
@@ -61,6 +97,27 @@ public class AnswerUploadService {
     private void validateDuration(int audioDurationMs) {
         if (audioDurationMs <= 0 || audioDurationMs > MAX_AUDIO_DURATION_MS) {
             throw new BusinessException(VoiceResponseCode.AUDIO_DURATION_INVALID);
+        }
+    }
+
+    private void validateUploadedObject(AnswerInfo answer, AudioObjectMetadata metadata) {
+        if (!answer.audioContentType().equals(metadata.contentType())) {
+            throw new BusinessException(
+                    VoiceResponseCode.AUDIO_CONTENT_TYPE_MISMATCH
+            );
+        }
+
+        if (metadata.contentLength() <= 0) {
+            throw new BusinessException(
+                    VoiceResponseCode.AUDIO_FILE_EMPTY
+            );
+        }
+
+        if (metadata.contentLength()
+                > voiceUploadProperties.maxFileSize().toBytes()) {
+            throw new BusinessException(
+                    VoiceResponseCode.AUDIO_FILE_SIZE_EXCEEDED
+            );
         }
     }
 }
