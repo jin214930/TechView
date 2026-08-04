@@ -6,7 +6,7 @@ import com.ward.techview.evaluation.api.AnswerAnalysisProvider;
 import com.ward.techview.evaluation.api.AnswerAnalysisResult;
 import com.ward.techview.evaluation.api.FollowUpDecision;
 import com.ward.techview.interview.api.AnswerAnalysisContext;
-import com.ward.techview.interview.api.InterviewAnswerApi;
+import com.ward.techview.interview.api.InterviewEvaluationContextApi;
 import com.ward.techview.processing.api.AnswerAnalysisJobControl;
 import com.ward.techview.processing.api.ClaimedAnswerAnalysisJob;
 import org.junit.jupiter.api.DisplayName;
@@ -38,7 +38,7 @@ class AnswerAnalysisProcessorTest {
     private AnswerAnalysisJobControl jobControl;
 
     @Mock
-    private InterviewAnswerApi interviewAnswerApi;
+    private InterviewEvaluationContextApi interviewEvaluationContextApi;
 
     @Mock
     private AnswerAnalysisProvider analysisProvider;
@@ -57,7 +57,7 @@ class AnswerAnalysisProcessorTest {
         processor.process(PROCESSING_JOB_ID);
 
         verify(jobControl).claim(PROCESSING_JOB_ID);
-        verifyNoInteractions(interviewAnswerApi, analysisProvider, completionService);
+        verifyNoInteractions(interviewEvaluationContextApi, analysisProvider, completionService);
     }
 
     @Test
@@ -118,7 +118,7 @@ class AnswerAnalysisProcessorTest {
 
     private void prepare(AnswerAnalysisContext context) {
         when(jobControl.claim(PROCESSING_JOB_ID)).thenReturn(Optional.of(JOB));
-        when(interviewAnswerApi.getAnalysisContext(JOB.interviewSessionId(), JOB.answerId()))
+        when(interviewEvaluationContextApi.getAnalysisContext(JOB.interviewSessionId(), JOB.answerId()))
                 .thenReturn(context);
     }
 
