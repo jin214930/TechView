@@ -1,6 +1,7 @@
 package com.ward.techview.processing.service;
 
 import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
+import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
 import com.ward.techview.processing.api.FinalFeedbackJobQueuedEvent;
 import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
@@ -146,6 +147,34 @@ class ProcessingJobPollingServiceTest {
                         exhaustedJob.getErrorCode()
                 )
         );
+        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        AnswerProcessingStatusChangedEvent event = assertInstanceOf(
+                AnswerProcessingStatusChangedEvent.class,
+                eventCaptor.getValue()
+        );
+        assertEquals(10L, event.interviewSessionId());
+    }
+
+    @Test
+    @DisplayName("최종 피드백 작업의 lease 만료에는 답변 처리 상태 이벤트를 발행하지 않는다")
+    void doesNotPublishAnswerStatusEventForExhaustedFeedbackJob() {
+        ProcessingJob exhaustedJob = exhaustedFeedbackJob(500L);
+        when(processingJobRepository.findExhaustedExpiredJobs(
+                eq(ProcessingJobStatus.PROCESSING),
+                any(OffsetDateTime.class),
+                any(Pageable.class)
+        )).thenReturn(List.of(exhaustedJob));
+        when(processingJobRepository.findDispatchableJobs(
+                any(),
+                eq(ProcessingJobStatus.PROCESSING),
+                any(OffsetDateTime.class),
+                any(Pageable.class)
+        )).thenReturn(List.of());
+
+        pollingService.pollAndPublish();
+
+        assertEquals(ProcessingJobStatus.FAILED, exhaustedJob.getStatus());
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
@@ -188,6 +217,30 @@ class ProcessingJobPollingServiceTest {
                 20L,
                 "interviews/10/answers/20/audio.webm",
                 "verified-etag",
+                firstAttemptAt
+        );
+        job.claim(firstAttemptAt, Duration.ofSeconds(1));
+        job.retry(
+                firstAttemptAt.plusMinutes(1),
+                "TEMPORARY_FAILURE",
+                "일시적 오류"
+        );
+        job.claim(firstAttemptAt.plusMinutes(1), Duration.ofSeconds(1));
+        job.retry(
+                firstAttemptAt.plusMinutes(2),
+                "TEMPORARY_FAILURE",
+                "일시적 오류"
+        );
+        job.claim(firstAttemptAt.plusMinutes(2), Duration.ofSeconds(1));
+        setId(job, id);
+        return job;
+    }
+
+    private static ProcessingJob exhaustedFeedbackJob(Long id) {
+        OffsetDateTime firstAttemptAt =
+                OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(10);
+        FinalFeedbackProcessingJob job = FinalFeedbackProcessingJob.create(
+                10L,
                 firstAttemptAt
         );
         job.claim(firstAttemptAt, Duration.ofSeconds(1));

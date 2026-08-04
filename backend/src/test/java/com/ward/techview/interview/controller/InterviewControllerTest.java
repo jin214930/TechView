@@ -11,6 +11,7 @@ import com.ward.techview.interview.dto.InterviewStartResponse;
 import com.ward.techview.interview.entity.InterviewTurnType;
 import com.ward.techview.interview.response.InterviewResponseCode;
 import com.ward.techview.interview.service.InterviewProgressQueryService;
+import com.ward.techview.interview.service.InterviewProgressSseService;
 import com.ward.techview.interview.service.InterviewService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +23,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -33,6 +36,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
@@ -51,6 +56,9 @@ class InterviewControllerTest {
     @Mock
     private InterviewProgressQueryService interviewProgressQueryService;
 
+    @Mock
+    private InterviewProgressSseService interviewProgressSseService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -59,7 +67,11 @@ class InterviewControllerTest {
                 new UsernamePasswordAuthenticationToken(PRINCIPAL, null, List.of())
         );
 
-        mockMvc = standaloneSetup(new InterviewController(interviewService, interviewProgressQueryService))
+        mockMvc = standaloneSetup(new InterviewController(
+                interviewService,
+                interviewProgressQueryService,
+                interviewProgressSseService
+        ))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler(), new ApiResponseAdvice())
                 .build();
@@ -183,6 +195,22 @@ class InterviewControllerTest {
                 .andExpect(jsonPath("$.data.errorMessage").doesNotExist());
 
         verify(interviewProgressQueryService).getProgress(MEMBER_ID, SESSION_ID);
+    }
+
+    @Test
+    @DisplayName("면접 진행 상태 SSE 스트림을 구독한다")
+    void shouldSubscribeToInterviewProgressEvents() throws Exception {
+        SseEmitter emitter = new SseEmitter();
+        when(interviewProgressSseService.subscribe(MEMBER_ID, SESSION_ID))
+                .thenReturn(emitter);
+
+        mockMvc.perform(get("/api/v1/interviews/{sessionId}/events", SESSION_ID))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
+
+        verify(interviewProgressSseService).subscribe(MEMBER_ID, SESSION_ID);
+        emitter.complete();
     }
 
     private static InterviewStartResponse startResponse(boolean resumed) {

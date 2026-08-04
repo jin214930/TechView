@@ -1,11 +1,15 @@
 package com.ward.techview.processing.service;
 
 import com.ward.techview.processing.api.AnswerAnalysisJobControl;
+import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
 import com.ward.techview.processing.api.ClaimedAnswerAnalysisJob;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.AnswerAnalysisProcessingJob;
+import com.ward.techview.processing.entity.ProcessingJob;
+import com.ward.techview.processing.entity.ProcessingJobStatus;
 import com.ward.techview.processing.repository.AnswerAnalysisProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +22,7 @@ import java.util.Optional;
 public class AnswerAnalysisJobControlService implements AnswerAnalysisJobControl {
     private final AnswerAnalysisProcessingJobRepository repository;
     private final ProcessingWorkerProperties properties;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -35,6 +40,7 @@ public class AnswerAnalysisJobControlService implements AnswerAnalysisJobControl
         return findCurrentAttempt(processingJobId, attemptCount)
                 .map(job -> {
                     job.succeed();
+                    publishStatusChanged(job);
                     return true;
                 })
                 .orElse(false);
@@ -52,6 +58,9 @@ public class AnswerAnalysisJobControlService implements AnswerAnalysisJobControl
         return findCurrentAttempt(processingJobId, attemptCount)
                 .map(job -> {
                     job.retry(nextAttemptAt, errorCode, errorMessage);
+                    if (job.getStatus() == ProcessingJobStatus.FAILED) {
+                        publishStatusChanged(job);
+                    }
                     return true;
                 })
                 .orElse(false);
@@ -68,6 +77,7 @@ public class AnswerAnalysisJobControlService implements AnswerAnalysisJobControl
         return findCurrentAttempt(processingJobId, attemptCount)
                 .map(job -> {
                     job.fail(errorCode, errorMessage);
+                    publishStatusChanged(job);
                     return true;
                 })
                 .orElse(false);
@@ -87,5 +97,11 @@ public class AnswerAnalysisJobControlService implements AnswerAnalysisJobControl
     private Optional<AnswerAnalysisProcessingJob> findCurrentAttempt(Long processingJobId, int attemptCount) {
         return repository.findByIdForUpdate(processingJobId)
                 .filter(job -> job.isCurrentAttempt(attemptCount));
+    }
+
+    private void publishStatusChanged(ProcessingJob job) {
+        eventPublisher.publishEvent(
+                new AnswerProcessingStatusChangedEvent(job.getInterviewSessionId())
+        );
     }
 }

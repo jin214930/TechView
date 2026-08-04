@@ -1,6 +1,7 @@
 package com.ward.techview.processing.service;
 
 import com.ward.techview.processing.api.ClaimedAnswerAnalysisJob;
+import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.AnswerAnalysisProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -24,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +40,9 @@ class AnswerAnalysisJobControlServiceTest {
     @Mock
     private AnswerAnalysisProcessingJobRepository repository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private AnswerAnalysisJobControlService service;
 
     @BeforeEach
@@ -48,7 +54,7 @@ class AnswerAnalysisJobControlServiceTest {
                 Duration.ofSeconds(10),
                 20
         );
-        service = new AnswerAnalysisJobControlService(repository, properties);
+        service = new AnswerAnalysisJobControlService(repository, properties, eventPublisher);
     }
 
     @Test
@@ -110,6 +116,7 @@ class AnswerAnalysisJobControlServiceTest {
                 () -> assertEquals(0, job.getAttemptCount()),
                 () -> assertNull(job.getLeaseExpiresAt())
         );
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -126,6 +133,7 @@ class AnswerAnalysisJobControlServiceTest {
                 () -> assertEquals(ProcessingJobStatus.SUCCEEDED, job.getStatus()),
                 () -> assertNull(job.getLeaseExpiresAt())
         );
+        verify(eventPublisher).publishEvent(new AnswerProcessingStatusChangedEvent(SESSION_ID));
     }
 
     @Test
@@ -152,6 +160,7 @@ class AnswerAnalysisJobControlServiceTest {
                 () -> assertEquals("LLM_TIMEOUT", job.getErrorCode()),
                 () -> assertEquals("LLM 응답 시간이 초과되었습니다.", job.getErrorMessage())
         );
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -175,6 +184,29 @@ class AnswerAnalysisJobControlServiceTest {
                 () -> assertEquals("LLM_INVALID_RESPONSE", job.getErrorCode()),
                 () -> assertEquals("LLM 구조화 응답이 올바르지 않습니다.", job.getErrorMessage())
         );
+        verify(eventPublisher).publishEvent(new AnswerProcessingStatusChangedEvent(SESSION_ID));
+    }
+
+    @Test
+    @DisplayName("답변 분석 작업이 재시도 한도에 도달하면 실패 이벤트를 발행한다")
+    void publishesFailureEventWhenRetryLimitIsReached() {
+        AnswerAnalysisProcessingJob job = createThirdAttemptJob();
+        when(repository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = service.retry(
+                PROCESSING_JOB_ID,
+                3,
+                OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5),
+                "LLM_TIMEOUT",
+                "LLM 응답 시간이 초과되었습니다."
+        );
+
+        assertAll(
+                () -> assertTrue(result),
+                () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus())
+        );
+        verify(eventPublisher).publishEvent(new AnswerProcessingStatusChangedEvent(SESSION_ID));
     }
 
     @Test
@@ -226,6 +258,19 @@ class AnswerAnalysisJobControlServiceTest {
         job.claim(firstAttemptAt, LEASE_DURATION);
         job.retry(secondAttemptAt, "LLM_TIMEOUT", "첫 번째 실패");
         job.claim(secondAttemptAt, LEASE_DURATION);
+        return job;
+    }
+
+    private static AnswerAnalysisProcessingJob createThirdAttemptJob() {
+        OffsetDateTime firstAttemptAt = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(3);
+        OffsetDateTime secondAttemptAt = firstAttemptAt.plusMinutes(1);
+        OffsetDateTime thirdAttemptAt = secondAttemptAt.plusMinutes(1);
+        AnswerAnalysisProcessingJob job = createJob(firstAttemptAt);
+        job.claim(firstAttemptAt, LEASE_DURATION);
+        job.retry(secondAttemptAt, "LLM_TIMEOUT", "첫 번째 실패");
+        job.claim(secondAttemptAt, LEASE_DURATION);
+        job.retry(thirdAttemptAt, "LLM_TIMEOUT", "두 번째 실패");
+        job.claim(thirdAttemptAt, LEASE_DURATION);
         return job;
     }
 

@@ -1,6 +1,7 @@
 package com.ward.techview.processing.service;
 
 import com.ward.techview.processing.api.ClaimedSttJob;
+import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
 import com.ward.techview.processing.entity.SttProcessingJob;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -25,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,6 +43,9 @@ class SttJobControlServiceTest {
     @Mock
     private SttProcessingJobRepository sttProcessingJobRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private SttJobControlService sttJobControlService;
 
     @BeforeEach
@@ -53,7 +59,8 @@ class SttJobControlServiceTest {
         );
         sttJobControlService = new SttJobControlService(
                 sttProcessingJobRepository,
-                properties
+                properties,
+                eventPublisher
         );
     }
 
@@ -228,6 +235,7 @@ class SttJobControlServiceTest {
                 () -> assertNull(job.getLeaseExpiresAt())
         );
         verify(sttProcessingJobRepository).findByIdForUpdate(PROCESSING_JOB_ID);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -256,6 +264,7 @@ class SttJobControlServiceTest {
                 () -> assertEquals("STT_TIMEOUT", job.getErrorCode()),
                 () -> assertEquals("STT 요청 시간이 초과되었습니다.", job.getErrorMessage())
         );
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -281,6 +290,29 @@ class SttJobControlServiceTest {
                 () -> assertEquals("INVALID_AUDIO", job.getErrorCode()),
                 () -> assertEquals("지원하지 않는 음성 파일입니다.", job.getErrorMessage())
         );
+        verify(eventPublisher).publishEvent(new AnswerProcessingStatusChangedEvent(SESSION_ID));
+    }
+
+    @Test
+    @DisplayName("STT 작업이 재시도 한도에 도달하면 실패 이벤트를 발행한다")
+    void publishesFailureEventWhenRetryLimitIsReached() {
+        SttProcessingJob job = createThirdAttemptJob();
+        when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
+                .thenReturn(Optional.of(job));
+
+        boolean result = sttJobControlService.retry(
+                PROCESSING_JOB_ID,
+                3,
+                OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5),
+                "STT_TIMEOUT",
+                "STT 요청 시간이 초과되었습니다."
+        );
+
+        assertAll(
+                () -> assertTrue(result),
+                () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus())
+        );
+        verify(eventPublisher).publishEvent(new AnswerProcessingStatusChangedEvent(SESSION_ID));
     }
 
     @Test
@@ -351,6 +383,19 @@ class SttJobControlServiceTest {
         job.claim(firstAttemptAt, LEASE_DURATION);
         job.retry(secondAttemptAt, "STT_TIMEOUT", "첫 번째 실패");
         job.claim(secondAttemptAt, LEASE_DURATION);
+        return job;
+    }
+
+    private static SttProcessingJob createThirdAttemptJob() {
+        OffsetDateTime firstAttemptAt = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(3);
+        OffsetDateTime secondAttemptAt = firstAttemptAt.plusMinutes(1);
+        OffsetDateTime thirdAttemptAt = secondAttemptAt.plusMinutes(1);
+        SttProcessingJob job = createJob(firstAttemptAt);
+        job.claim(firstAttemptAt, LEASE_DURATION);
+        job.retry(secondAttemptAt, "STT_TIMEOUT", "첫 번째 실패");
+        job.claim(secondAttemptAt, LEASE_DURATION);
+        job.retry(thirdAttemptAt, "STT_TIMEOUT", "두 번째 실패");
+        job.claim(thirdAttemptAt, LEASE_DURATION);
         return job;
     }
 
