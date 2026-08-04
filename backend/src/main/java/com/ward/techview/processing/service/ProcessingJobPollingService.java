@@ -1,13 +1,9 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
-import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
-import com.ward.techview.processing.api.FinalFeedbackJobQueuedEvent;
-import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
+import com.ward.techview.processing.api.*;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.ProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
-import com.ward.techview.processing.entity.ProcessingJobType;
 import com.ward.techview.processing.repository.ProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -59,9 +55,7 @@ public class ProcessingJobPollingService {
                     "최대 시도 횟수에서 작업 처리 lease가 만료되었습니다."
             );
 
-            if (job.getJobType() == ProcessingJobType.STT_TRANSCRIPTION || job.getJobType() == ProcessingJobType.ANSWER_ANALYSIS) {
-                eventPublisher.publishEvent(new AnswerProcessingStatusChangedEvent(job.getInterviewSessionId()));
-            }
+            publishTerminalStatusChangedEvent(job);
         });
     }
 
@@ -70,6 +64,17 @@ public class ProcessingJobPollingService {
             case STT_TRANSCRIPTION -> new SttTranscriptionJobQueuedEvent(job.getId());
             case ANSWER_ANALYSIS -> new AnswerAnalysisJobQueuedEvent(job.getId());
             case FINAL_FEEDBACK_GENERATION -> new FinalFeedbackJobQueuedEvent(job.getId());
+        };
+
+        eventPublisher.publishEvent(event);
+    }
+
+    private void publishTerminalStatusChangedEvent(ProcessingJob job) {
+        Object event = switch (job.getJobType()) {
+            case STT_TRANSCRIPTION, ANSWER_ANALYSIS ->
+                    new AnswerProcessingStatusChangedEvent(job.getInterviewSessionId());
+            case FINAL_FEEDBACK_GENERATION ->
+                    new FinalFeedbackProcessingStatusChangedEvent(job.getInterviewSessionId());
         };
 
         eventPublisher.publishEvent(event);
