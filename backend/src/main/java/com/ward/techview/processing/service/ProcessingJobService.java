@@ -1,13 +1,12 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
-import com.ward.techview.processing.api.ProcessingJobQueue;
-import com.ward.techview.processing.api.ProcessingJobReceipt;
-import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
+import com.ward.techview.processing.api.*;
 import com.ward.techview.processing.entity.AnswerAnalysisProcessingJob;
+import com.ward.techview.processing.entity.FinalFeedbackProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJob;
 import com.ward.techview.processing.entity.SttProcessingJob;
 import com.ward.techview.processing.repository.AnswerAnalysisProcessingJobRepository;
+import com.ward.techview.processing.repository.FinalFeedbackProcessingJobRepository;
 import com.ward.techview.processing.repository.SttProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -24,6 +23,7 @@ import java.util.Optional;
 public class ProcessingJobService implements ProcessingJobQueue {
     private final SttProcessingJobRepository sttProcessingJobRepository;
     private final AnswerAnalysisProcessingJobRepository answerAnalysisProcessingJobRepository;
+    private final FinalFeedbackProcessingJobRepository finalFeedbackProcessingJobRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -65,6 +65,15 @@ public class ProcessingJobService implements ProcessingJobQueue {
                 .orElseGet(() -> createAnswerAnalysisJob(interviewSessionId, answerId));
     }
 
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ProcessingJobReceipt createOrGetFinalFeedbackJob(Long interviewSessionId) {
+        return finalFeedbackProcessingJobRepository
+                .findByInterviewSessionId(interviewSessionId)
+                .map(this::toReceipt)
+                .orElseGet(() -> createFinalFeedbackJob(interviewSessionId));
+    }
+
     private ProcessingJobReceipt toReceipt(ProcessingJob job) {
         return new ProcessingJobReceipt(
                 job.getId(),
@@ -103,6 +112,16 @@ public class ProcessingJobService implements ProcessingJobQueue {
         answerAnalysisProcessingJobRepository.save(job);
 
         eventPublisher.publishEvent(new AnswerAnalysisJobQueuedEvent(job.getId()));
+
+        return toReceipt(job);
+    }
+
+    private ProcessingJobReceipt createFinalFeedbackJob(Long interviewSessionId) {
+        FinalFeedbackProcessingJob job = FinalFeedbackProcessingJob.create(interviewSessionId, OffsetDateTime.now(ZoneOffset.UTC));
+
+        finalFeedbackProcessingJobRepository.save(job);
+
+        eventPublisher.publishEvent(new FinalFeedbackJobQueuedEvent(job.getId()));
 
         return toReceipt(job);
     }

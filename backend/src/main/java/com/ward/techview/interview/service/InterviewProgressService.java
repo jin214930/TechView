@@ -1,6 +1,7 @@
 package com.ward.techview.interview.service;
 
 import com.ward.techview.interview.api.InterviewAdvanceCommand;
+import com.ward.techview.interview.api.InterviewAdvanceResult;
 import com.ward.techview.interview.api.InterviewProgressApi;
 import com.ward.techview.interview.entity.*;
 import com.ward.techview.interview.repository.*;
@@ -20,7 +21,7 @@ public class InterviewProgressService implements InterviewProgressApi {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public void advanceAfterAnalysis(InterviewAdvanceCommand command) {
+    public InterviewAdvanceResult advanceAfterAnalysis(InterviewAdvanceCommand command) {
         InterviewSession session = interviewSessionRepository
                 .findByIdForUpdate(command.interviewSessionId())
                 .orElseThrow(() -> new IllegalArgumentException("면접 세션을 찾을 수 없습니다."));
@@ -35,10 +36,10 @@ public class InterviewProgressService implements InterviewProgressApi {
 
         if (command.requiresFollowUp()) {
             createFollowUpTurn(session, currentTurn, currentCoreQuestion, command.followUpQuestion());
-            return;
+            return InterviewAdvanceResult.continued();
         }
 
-        createNextCoreTurnOrComplete(session, currentCoreQuestion, command);
+        return createNextCoreTurnOrComplete(session, currentCoreQuestion, command);
     }
 
     private void validateAnswer(InterviewSession session, Answer answer) {
@@ -76,14 +77,18 @@ public class InterviewProgressService implements InterviewProgressApi {
         interviewTurnRepository.save(followUpTurn);
     }
 
-    private void createNextCoreTurnOrComplete(InterviewSession session, InterviewCoreQuestion currentCoreQuestion, InterviewAdvanceCommand command) {
+    private InterviewAdvanceResult createNextCoreTurnOrComplete(InterviewSession session, InterviewCoreQuestion currentCoreQuestion, InterviewAdvanceCommand command) {
         int nextQuestionOrder = currentCoreQuestion.getQuestionOrder() + 1;
 
-        coreQuestionRepository.findBySessionIdAndQuestionOrder(session.getId(), nextQuestionOrder)
-                .ifPresentOrElse(
-                        nextCoreQuestion -> createCoreTurn(session, nextCoreQuestion),
-                        () -> session.complete(command.analyzedAt())
-                );
+        return coreQuestionRepository.findBySessionIdAndQuestionOrder(session.getId(), nextQuestionOrder)
+                .map(nextCoreQuestion -> {
+                    createCoreTurn(session, nextCoreQuestion);
+                    return InterviewAdvanceResult.continued();
+                })
+                .orElseGet(() -> {
+                    session.complete(command.analyzedAt());
+                    return InterviewAdvanceResult.completed();
+                });
     }
 
     private void createCoreTurn(InterviewSession session, InterviewCoreQuestion coreQuestion) {
