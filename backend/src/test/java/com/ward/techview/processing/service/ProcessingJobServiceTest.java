@@ -1,8 +1,11 @@
 package com.ward.techview.processing.service;
 
+import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
 import com.ward.techview.processing.api.ProcessingJobReceipt;
 import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
+import com.ward.techview.processing.entity.AnswerAnalysisProcessingJob;
 import com.ward.techview.processing.entity.SttProcessingJob;
+import com.ward.techview.processing.repository.AnswerAnalysisProcessingJobRepository;
 import com.ward.techview.processing.repository.SttProcessingJobRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,6 +39,9 @@ class ProcessingJobServiceTest {
 
     @Mock
     private SttProcessingJobRepository sttProcessingJobRepository;
+
+    @Mock
+    private AnswerAnalysisProcessingJobRepository answerAnalysisProcessingJobRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -98,12 +104,68 @@ class ProcessingJobServiceTest {
         assertEquals(PROCESSING_JOB_ID, eventCaptor.getValue().processingJobId());
     }
 
+    @Test
+    @DisplayName("기존 답변 분석 작업이 있으면 해당 작업을 반환하고 이벤트를 발행하지 않는다")
+    void shouldReturnExistingAnswerAnalysisJobWithoutPublishingEvent() {
+        AnswerAnalysisProcessingJob existingJob = answerAnalysisProcessingJob();
+        when(answerAnalysisProcessingJobRepository.findByAnswerId(ANSWER_ID))
+                .thenReturn(Optional.of(existingJob));
+
+        ProcessingJobReceipt result = processingJobService.createOrGetAnswerAnalysisJob(
+                SESSION_ID,
+                ANSWER_ID
+        );
+
+        assertReceipt(result);
+        verify(answerAnalysisProcessingJobRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("신규 답변 분석 작업을 저장하고 작업 대기 이벤트를 발행한다")
+    void shouldCreateAnswerAnalysisJobAndPublishQueuedEvent() {
+        when(answerAnalysisProcessingJobRepository.findByAnswerId(ANSWER_ID))
+                .thenReturn(Optional.empty());
+        when(answerAnalysisProcessingJobRepository.save(any(AnswerAnalysisProcessingJob.class)))
+                .thenAnswer(invocation -> {
+                    AnswerAnalysisProcessingJob job = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(job, "id", PROCESSING_JOB_ID);
+                    return job;
+                });
+
+        ProcessingJobReceipt result = processingJobService.createOrGetAnswerAnalysisJob(
+                SESSION_ID,
+                ANSWER_ID
+        );
+
+        assertReceipt(result);
+        ArgumentCaptor<AnswerAnalysisProcessingJob> jobCaptor =
+                ArgumentCaptor.forClass(AnswerAnalysisProcessingJob.class);
+        verify(answerAnalysisProcessingJobRepository).save(jobCaptor.capture());
+        assertEquals(ANSWER_ID, jobCaptor.getValue().getAnswerId());
+
+        ArgumentCaptor<AnswerAnalysisJobQueuedEvent> eventCaptor =
+                ArgumentCaptor.forClass(AnswerAnalysisJobQueuedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(PROCESSING_JOB_ID, eventCaptor.getValue().processingJobId());
+    }
+
     private static SttProcessingJob processingJob() {
         SttProcessingJob job = SttProcessingJob.create(
                 SESSION_ID,
                 ANSWER_ID,
                 AUDIO_OBJECT_KEY,
                 SOURCE_OBJECT_ETAG,
+                OffsetDateTime.now(ZoneOffset.UTC)
+        );
+        ReflectionTestUtils.setField(job, "id", PROCESSING_JOB_ID);
+        return job;
+    }
+
+    private static AnswerAnalysisProcessingJob answerAnalysisProcessingJob() {
+        AnswerAnalysisProcessingJob job = AnswerAnalysisProcessingJob.create(
+                SESSION_ID,
+                ANSWER_ID,
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
         ReflectionTestUtils.setField(job, "id", PROCESSING_JOB_ID);

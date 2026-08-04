@@ -3,6 +3,7 @@ package com.ward.techview.voice.service;
 import com.ward.techview.interview.api.AnswerTranscriptionCommand;
 import com.ward.techview.interview.api.InterviewAnswerApi;
 import com.ward.techview.processing.api.ClaimedSttJob;
+import com.ward.techview.processing.api.ProcessingJobQueue;
 import com.ward.techview.processing.api.SttJobControl;
 import com.ward.techview.voice.api.TranscriptionResult;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,11 +44,14 @@ class SttCompletionServiceTest {
     @Mock
     private SttJobControl sttJobControl;
 
+    @Mock
+    private ProcessingJobQueue processingJobQueue;
+
     @InjectMocks
     private SttCompletionService sttCompletionService;
 
     @Test
-    @DisplayName("답변에 전사 결과를 저장한 뒤 STT 작업을 정리 단계로 전환한다")
+    @DisplayName("전사 결과 저장과 정리 단계 전환 후 답변 분석 작업을 생성한다")
     void completesAnswerBeforeAdvancingJobToCleanup() {
         when(sttJobControl.advanceToCleanup(JOB.processingJobId(), JOB.attemptCount()))
                 .thenReturn(true);
@@ -55,11 +60,15 @@ class SttCompletionServiceTest {
 
         ArgumentCaptor<AnswerTranscriptionCommand> commandCaptor =
                 ArgumentCaptor.forClass(AnswerTranscriptionCommand.class);
-        InOrder order = inOrder(interviewAnswerApi, sttJobControl);
+        InOrder order = inOrder(interviewAnswerApi, sttJobControl, processingJobQueue);
         order.verify(interviewAnswerApi).completeTranscription(commandCaptor.capture());
         order.verify(sttJobControl).advanceToCleanup(
                 JOB.processingJobId(),
                 JOB.attemptCount()
+        );
+        order.verify(processingJobQueue).createOrGetAnswerAnalysisJob(
+                JOB.interviewSessionId(),
+                JOB.answerId()
         );
         AnswerTranscriptionCommand command = commandCaptor.getValue();
         assertAll(
@@ -83,5 +92,6 @@ class SttCompletionServiceTest {
         verify(interviewAnswerApi).completeTranscription(
                 org.mockito.ArgumentMatchers.any(AnswerTranscriptionCommand.class)
         );
+        verifyNoInteractions(processingJobQueue);
     }
 }
