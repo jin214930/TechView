@@ -12,10 +12,16 @@ import java.util.Objects;
 @Entity
 @Table(
         name = "interview_session",
-        indexes = @Index(
-                name = "idx_interview_session_member_status_started_at",
-                columnList = "member_id, status, started_at"
-        )
+        indexes = {
+                @Index(
+                        name = "idx_interview_session_member_status_started_at",
+                        columnList = "member_id, status, started_at"
+                ),
+                @Index(
+                        name = "idx_interview_session_member_status_id",
+                        columnList = "member_id, status, id"
+                )
+        }
 )
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

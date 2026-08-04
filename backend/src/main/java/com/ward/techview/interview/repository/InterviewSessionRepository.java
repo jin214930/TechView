@@ -3,6 +3,8 @@ package com.ward.techview.interview.repository;
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.entity.InterviewStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -39,4 +41,6 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
     Optional<InterviewSession> findByIdForUpdate(@Param("sessionId") Long sessionId);
 
     Optional<InterviewSession> findByIdAndMemberId(Long sessionId, Long memberId);
+
+    Page<InterviewSession> findAllByMemberIdAndStatus(Long memberId, InterviewStatus status, Pageable pageable);
 }
