@@ -8,7 +8,7 @@ public record InterviewFeedbackResponse(
         InterviewFeedbackDetailResponse feedback,
         String errorMessage
 ) {
-    private static final String GENERATION_FAILED_MESSAGE = "피드백 생성 중 오류가 발생했습니다.";
+    private static final String GENERATION_FAILED_MESSAGE = "피드백을 제공할 수 없습니다.";
 
     public static InterviewFeedbackResponse processing(Long sessionId) {
         return new InterviewFeedbackResponse(
