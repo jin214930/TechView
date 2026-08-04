@@ -2,7 +2,7 @@ package com.ward.techview.evaluation.service;
 
 import com.ward.techview.evaluation.api.*;
 import com.ward.techview.interview.api.AnswerAnalysisContext;
-import com.ward.techview.interview.api.InterviewAnswerApi;
+import com.ward.techview.interview.api.InterviewEvaluationContextApi;
 import com.ward.techview.processing.api.AnswerAnalysisJobControl;
 import com.ward.techview.processing.api.ClaimedAnswerAnalysisJob;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ public class AnswerAnalysisProcessor {
     private static final Duration MAX_RETRY_DELAY = Duration.ofMinutes(5);
 
     private final AnswerAnalysisJobControl jobControl;
-    private final InterviewAnswerApi interviewAnswerApi;
+    private final InterviewEvaluationContextApi interviewEvaluationContextApi;
     private final AnswerAnalysisProvider analysisProvider;
     private final AnswerAnalysisCompletionService completionService;
 
@@ -32,7 +32,7 @@ public class AnswerAnalysisProcessor {
 
     private void processClaimedJob(ClaimedAnswerAnalysisJob job) {
         try {
-            AnswerAnalysisContext context = interviewAnswerApi.getAnalysisContext(job.interviewSessionId(), job.answerId());
+            AnswerAnalysisContext context = interviewEvaluationContextApi.getAnalysisContext(job.interviewSessionId(), job.answerId());
 
             AnswerAnalysisPrompt prompt = toPrompt(context);
 

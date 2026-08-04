@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface AnswerRepository extends JpaRepository<Answer, Long> {
@@ -55,4 +56,17 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
               AND session.id = :sessionId
             """)
     Optional<Answer> findAnalysisTarget(@Param("sessionId") Long sessionId, @Param("answerId") Long answerId);
+
+    @Query("""
+            SELECT answer
+            FROM Answer answer
+            JOIN FETCH answer.interviewTurn turn
+            JOIN FETCH turn.session session
+            LEFT JOIN FETCH turn.interviewCoreQuestion coreQuestion
+            LEFT JOIN FETCH turn.followUpQuestion followUpQuestion
+            LEFT JOIN FETCH followUpQuestion.coreQuestion followUpCoreQuestion
+            WHERE session.id = :interviewSessionId
+            ORDER BY turn.turnOrder
+            """)
+    List<Answer> findAllFeedbackTargets(@Param("interviewSessionId") Long interviewSessionId);
 }
