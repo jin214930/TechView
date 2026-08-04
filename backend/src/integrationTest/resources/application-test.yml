@@ -43,3 +43,11 @@ custom:
       model: gpt-4o-mini-transcribe
       language: ko
       timeout: 1s
+  analysis:
+    openai:
+      base-url: http://localhost
+      api-key: test-openai-api-key
+      model: test-answer-analysis-model
+      prompt-version: answer-analysis-test-v1
+      max-output-tokens: 1000
+      timeout: 1s

@@ -1,5 +1,5 @@
 @ApplicationModule(
-        allowedDependencies = {"voice::api"}
+        allowedDependencies = {"voice::api", "evaluation::api"}
 )
 
 package com.ward.techview.integration;
