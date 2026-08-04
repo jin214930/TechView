@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface FinalFeedbackProcessingJobRepository extends JpaRepository<FinalFeedbackProcessingJob, Long> {
     Optional<FinalFeedbackProcessingJob> findByInterviewSessionId(Long interviewSessionId);
@@ -19,4 +21,6 @@ public interface FinalFeedbackProcessingJobRepository extends JpaRepository<Fina
             WHERE job.id = :processingJobId
             """)
     Optional<FinalFeedbackProcessingJob> findByIdForUpdate(@Param("processingJobId") Long processingJobId);
+
+    List<FinalFeedbackProcessingJob> findAllByInterviewSessionIdIn(Set<Long> interviewSessionIds);
 }
