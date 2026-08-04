@@ -3,9 +3,13 @@ package com.ward.techview.evaluation.controller;
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.common.exception.GlobalExceptionHandler;
 import com.ward.techview.common.response.ApiResponseAdvice;
+import com.ward.techview.common.response.PageResponse;
 import com.ward.techview.common.security.CustomUserDetails;
 import com.ward.techview.evaluation.dto.InterviewFeedbackResponse;
+import com.ward.techview.evaluation.dto.InterviewFeedbackStatus;
+import com.ward.techview.evaluation.dto.InterviewHistoryItemResponse;
 import com.ward.techview.evaluation.response.EvaluationResponseCode;
+import com.ward.techview.evaluation.service.InterviewFeedbackHistoryQueryService;
 import com.ward.techview.evaluation.service.InterviewFeedbackQueryService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +23,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.mockito.Mockito.verify;
@@ -39,6 +45,9 @@ class InterviewFeedbackControllerTest {
     @Mock
     private InterviewFeedbackQueryService feedbackQueryService;
 
+    @Mock
+    private InterviewFeedbackHistoryQueryService feedbackHistoryQueryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -48,7 +57,10 @@ class InterviewFeedbackControllerTest {
         );
 
         mockMvc = standaloneSetup(
-                new InterviewFeedbackController(feedbackQueryService)
+                new InterviewFeedbackController(
+                        feedbackQueryService,
+                        feedbackHistoryQueryService
+                )
         )
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler(), new ApiResponseAdvice())
@@ -88,5 +100,48 @@ class InterviewFeedbackControllerTest {
         mockMvc.perform(get("/api/v1/interviews/{sessionId}/feedback", SESSION_ID))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value(5000));
+    }
+
+    @Test
+    @DisplayName("본인의 완료된 면접 기록을 기본 페이지 조건으로 조회한다")
+    void returnsMyCompletedInterviewHistory() throws Exception {
+        OffsetDateTime startedAt = OffsetDateTime.of(
+                2026,
+                8,
+                5,
+                10,
+                0,
+                0,
+                0,
+                ZoneOffset.UTC
+        );
+        PageResponse<InterviewHistoryItemResponse> response = new PageResponse<>(
+                List.of(new InterviewHistoryItemResponse(
+                        SESSION_ID,
+                        startedAt,
+                        startedAt.plusMinutes(15),
+                        InterviewFeedbackStatus.COMPLETED
+                )),
+                0,
+                10,
+                1,
+                1,
+                false
+        );
+        when(feedbackHistoryQueryService.getCompletedInterviews(MEMBER_ID, 0, 10))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/interviews"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.items[0].sessionId").value(SESSION_ID))
+                .andExpect(jsonPath("$.data.items[0].feedbackStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(10))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(1))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+
+        verify(feedbackHistoryQueryService).getCompletedInterviews(MEMBER_ID, 0, 10);
     }
 }
