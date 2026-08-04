@@ -1,6 +1,7 @@
 package com.ward.techview.processing.service;
 
 import com.ward.techview.processing.api.ClaimedFinalFeedbackJob;
+import com.ward.techview.processing.api.FinalFeedbackProcessingStatusChangedEvent;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.FinalFeedbackProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
@@ -24,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +39,9 @@ class FinalFeedbackJobControlServiceTest {
     @Mock
     private FinalFeedbackProcessingJobRepository repository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private FinalFeedbackJobControlService service;
 
     @BeforeEach
@@ -47,7 +53,11 @@ class FinalFeedbackJobControlServiceTest {
                 Duration.ofSeconds(10),
                 20
         );
-        service = new FinalFeedbackJobControlService(repository, properties);
+        service = new FinalFeedbackJobControlService(
+                repository,
+                properties,
+                eventPublisher
+        );
     }
 
     @Test
@@ -120,6 +130,9 @@ class FinalFeedbackJobControlServiceTest {
                 () -> assertEquals(ProcessingJobStatus.SUCCEEDED, job.getStatus()),
                 () -> assertNull(job.getLeaseExpiresAt())
         );
+        verify(eventPublisher).publishEvent(
+                new FinalFeedbackProcessingStatusChangedEvent(SESSION_ID)
+        );
     }
 
     @Test
@@ -146,6 +159,9 @@ class FinalFeedbackJobControlServiceTest {
                 () -> assertEquals("LLM_TIMEOUT", job.getErrorCode()),
                 () -> assertEquals("LLM 응답 시간이 초과되었습니다.", job.getErrorMessage())
         );
+        verify(eventPublisher, never()).publishEvent(
+                org.mockito.ArgumentMatchers.any()
+        );
     }
 
     @Test
@@ -169,6 +185,9 @@ class FinalFeedbackJobControlServiceTest {
                 () -> assertEquals("LLM_INVALID_RESPONSE", job.getErrorCode()),
                 () -> assertEquals("LLM 구조화 응답이 올바르지 않습니다.", job.getErrorMessage())
         );
+        verify(eventPublisher).publishEvent(
+                new FinalFeedbackProcessingStatusChangedEvent(SESSION_ID)
+        );
     }
 
     @Test
@@ -191,6 +210,9 @@ class FinalFeedbackJobControlServiceTest {
                 () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus()),
                 () -> assertEquals("LLM_TIMEOUT", job.getErrorCode()),
                 () -> assertEquals("LLM 응답 시간이 초과되었습니다.", job.getErrorMessage())
+        );
+        verify(eventPublisher).publishEvent(
+                new FinalFeedbackProcessingStatusChangedEvent(SESSION_ID)
         );
     }
 
@@ -226,6 +248,9 @@ class FinalFeedbackJobControlServiceTest {
                 () -> assertEquals(leaseExpiresAt, job.getLeaseExpiresAt()),
                 () -> assertEquals("LLM_TIMEOUT", job.getErrorCode()),
                 () -> assertEquals("첫 번째 실패", job.getErrorMessage())
+        );
+        verify(eventPublisher, never()).publishEvent(
+                org.mockito.ArgumentMatchers.any()
         );
     }
 
