@@ -46,4 +46,27 @@ public class InterviewSession extends BaseEntity {
     public static InterviewSession create(Long memberId, OffsetDateTime startedAt) {
         return new InterviewSession(memberId, startedAt);
     }
+
+    public int advanceTurn() {
+        validateInProgress();
+
+        if (currentTurnOrder >= 10) {
+            throw new IllegalStateException("면접 턴 순서는 10을 초과할 수 없습니다.");
+        }
+
+        return ++currentTurnOrder;
+    }
+
+    public void complete(OffsetDateTime completedAt) {
+        validateInProgress();
+
+        this.completedAt = Objects.requireNonNull(completedAt, "면접 완료 시각은 필수입니다.");
+        this.status = InterviewStatus.COMPLETED;
+    }
+
+    private void validateInProgress() {
+        if (status != InterviewStatus.IN_PROGRESS) {
+            throw new IllegalStateException("진행 중인 면접 세션만 변경할 수 있습니다.");
+        }
+    }
 }
