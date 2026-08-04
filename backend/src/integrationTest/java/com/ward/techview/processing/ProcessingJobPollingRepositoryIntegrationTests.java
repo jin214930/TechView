@@ -54,6 +54,7 @@ class ProcessingJobPollingRepositoryIntegrationTests {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private Long memberId;
     private Long interviewSessionId;
 
     @BeforeEach
@@ -69,19 +70,17 @@ class ProcessingJobPollingRepositoryIntegrationTests {
                         "polling-user"
                 )
         );
-        InterviewSession session = interviewSessionRepository.saveAndFlush(
-                InterviewSession.create(
-                        member.getId(),
-                        OffsetDateTime.now(ZoneOffset.UTC)
-                )
-        );
-        interviewSessionId = session.getId();
+        memberId = member.getId();
+        interviewSessionId = createInterviewSession();
     }
 
     @Test
     @DisplayName("실행 시각이 된 대기 작업과 lease가 만료된 작업만 조회한다")
     void findsOnlyDispatchableJobs() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        Long futureJobSessionId = createInterviewSession();
+        Long expiredLeaseJobSessionId = createInterviewSession();
+
         ProcessingJob queuedJob = processingJobRepository.save(
                 FinalFeedbackProcessingJob.create(
                         interviewSessionId,
@@ -90,13 +89,13 @@ class ProcessingJobPollingRepositoryIntegrationTests {
         );
         ProcessingJob futureJob = processingJobRepository.save(
                 FinalFeedbackProcessingJob.create(
-                        interviewSessionId,
+                        futureJobSessionId,
                         now.plusMinutes(1)
                 )
         );
         FinalFeedbackProcessingJob expiredLeaseJob =
                 FinalFeedbackProcessingJob.create(
-                        interviewSessionId,
+                        expiredLeaseJobSessionId,
                         now.minusMinutes(2)
                 );
         expiredLeaseJob.claim(
@@ -186,5 +185,15 @@ class ProcessingJobPollingRepositoryIntegrationTests {
         );
 
         assertEquals(1, indexCount);
+    }
+
+    private Long createInterviewSession() {
+        InterviewSession session = interviewSessionRepository.saveAndFlush(
+                InterviewSession.create(
+                        memberId,
+                        OffsetDateTime.now(ZoneOffset.UTC)
+                )
+        );
+        return session.getId();
     }
 }
