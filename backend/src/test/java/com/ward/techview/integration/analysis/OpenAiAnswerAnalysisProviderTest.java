@@ -18,7 +18,6 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,8 +55,6 @@ class OpenAiAnswerAnalysisProviderTest {
         objectMapper = new ObjectMapper();
 
         OpenAiAnswerAnalysisProperties properties = new OpenAiAnswerAnalysisProperties(
-                URI.create(BASE_URL),
-                "test-api-key",
                 MODEL,
                 PROMPT_VERSION,
                 1000,
@@ -65,7 +62,7 @@ class OpenAiAnswerAnalysisProviderTest {
         );
 
         provider = new OpenAiAnswerAnalysisProvider(
-                builder.baseUrl(properties.baseUrl().toString()).build(),
+                builder.baseUrl(BASE_URL).build(),
                 objectMapper,
                 properties
         );

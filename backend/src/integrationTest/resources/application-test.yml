@@ -36,18 +36,23 @@ custom:
   auth:
     refresh-token:
       hash-secret-key: TECHVIEW_REFRESH_TOKEN_HASH_SECRET_KEY_FOR_INTEGRATION_TESTS
+  openai:
+    base-url: http://localhost
+    api-key: test-openai-api-key
   stt:
     openai:
-      base-url: http://localhost
-      api-key: test-openai-api-key
       model: gpt-4o-mini-transcribe
       language: ko
       timeout: 1s
   analysis:
     openai:
-      base-url: http://localhost
-      api-key: test-openai-api-key
       model: test-answer-analysis-model
       prompt-version: answer-analysis-test-v1
       max-output-tokens: 1000
+      timeout: 1s
+  feedback:
+    openai:
+      model: test-interview-feedback-model
+      prompt-version: interview-feedback-test-v1
+      max-output-tokens: 2000
       timeout: 1s
