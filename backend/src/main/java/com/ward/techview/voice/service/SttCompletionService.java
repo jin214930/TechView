@@ -3,6 +3,7 @@ package com.ward.techview.voice.service;
 import com.ward.techview.interview.api.AnswerTranscriptionCommand;
 import com.ward.techview.interview.api.InterviewAnswerApi;
 import com.ward.techview.processing.api.ClaimedSttJob;
+import com.ward.techview.processing.api.ProcessingJobQueue;
 import com.ward.techview.processing.api.SttJobControl;
 import com.ward.techview.voice.api.TranscriptionResult;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.time.ZoneOffset;
 public class SttCompletionService {
     private final InterviewAnswerApi interviewAnswerApi;
     private final SttJobControl sttJobControl;
+    private final ProcessingJobQueue processingJobQueue;
 
     @Transactional
     public void completeTranscription(ClaimedSttJob job, TranscriptionResult result) {
@@ -37,5 +39,7 @@ public class SttCompletionService {
         if (!advanced) {
             throw new IllegalStateException("STT 작업 처리 권한이 만료되었습니다.");
         }
+
+        processingJobQueue.createOrGetAnswerAnalysisJob(job.interviewSessionId(), job.answerId());
     }
 }

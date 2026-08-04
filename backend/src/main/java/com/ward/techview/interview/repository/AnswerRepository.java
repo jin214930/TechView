@@ -42,4 +42,17 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
               AND session.id = :interviewSessionId
             """)
     Optional<Answer> findByIdAndSessionIdForUpdate(@Param("answerId") Long answerId, @Param("interviewSessionId") Long interviewSessionId);
+
+    @Query("""
+            SELECT answer
+            FROM Answer answer
+            JOIN FETCH answer.interviewTurn turn
+            JOIN FETCH turn.session session
+            LEFT JOIN FETCH turn.interviewCoreQuestion coreQuestion
+            LEFT JOIN FETCH turn.followUpQuestion followUpQuestion
+            LEFT JOIN FETCH followUpQuestion.coreQuestion followUpCoreQuestion
+            WHERE answer.id = :answerId
+              AND session.id = :sessionId
+            """)
+    Optional<Answer> findAnalysisTarget(@Param("sessionId") Long sessionId, @Param("answerId") Long answerId);
 }

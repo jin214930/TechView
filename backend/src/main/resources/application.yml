@@ -50,3 +50,11 @@ custom:
       model: ${OPENAI_STT_MODEL}
       language: ${OPENAI_STT_LANGUAGE}
       timeout: ${OPENAI_STT_TIMEOUT}
+  analysis:
+    openai:
+      base-url: ${OPENAI_BASE_URL}
+      api-key: ${OPENAI_API_KEY}
+      model: ${OPENAI_ANSWER_ANALYSIS_MODEL}
+      prompt-version: ${OPENAI_ANSWER_ANALYSIS_PROMPT_VERSION}
+      max-output-tokens: ${OPENAI_ANSWER_ANALYSIS_MAX_OUTPUT_TOKENS:1000}
+      timeout: ${OPENAI_ANSWER_ANALYSIS_TIMEOUT:60s}

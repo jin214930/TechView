@@ -8,4 +8,6 @@ public interface InterviewAnswerApi {
     AnswerInfo lockAnswerForProcessing(Long memberId, Long interviewSessionId, Long answerId);
 
     void completeTranscription(AnswerTranscriptionCommand command);
+
+    AnswerAnalysisContext getAnalysisContext(Long interviewSessionId, Long answerId);
 }

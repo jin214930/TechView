@@ -13,4 +13,6 @@ public interface ProcessingJobQueue {
             String audioObjectKey,
             String sourceObjectEtag
     );
+
+    ProcessingJobReceipt createOrGetAnswerAnalysisJob(Long interviewSessionId, Long answerId);
 }

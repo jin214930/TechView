@@ -29,4 +29,12 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
               AND session.memberId = :memberId
             """)
     Optional<InterviewSession> findByIdAndMemberIdForUpdate(@Param("sessionId") Long sessionId, @Param("memberId") Long memberId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT session
+            FROM InterviewSession session
+            WHERE session.id = :sessionId
+            """)
+    Optional<InterviewSession> findByIdForUpdate(@Param("sessionId") Long sessionId);
 }
