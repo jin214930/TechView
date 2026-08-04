@@ -43,18 +43,23 @@ custom:
       queue-capacity: ${PROCESSING_WORKER_QUEUE_CAPACITY:20}
       polling-delay: ${PROCESSING_WORKER_POLLING_DELAY:10s}
       polling-batch-size: ${PROCESSING_WORKER_POLLING_BATCH_SIZE:20}
+  openai:
+    base-url: ${OPENAI_BASE_URL}
+    api-key: ${OPENAI_API_KEY}
   stt:
     openai:
-      base-url: ${OPENAI_BASE_URL}
-      api-key: ${OPENAI_API_KEY}
       model: ${OPENAI_STT_MODEL}
       language: ${OPENAI_STT_LANGUAGE}
       timeout: ${OPENAI_STT_TIMEOUT}
   analysis:
     openai:
-      base-url: ${OPENAI_BASE_URL}
-      api-key: ${OPENAI_API_KEY}
       model: ${OPENAI_ANSWER_ANALYSIS_MODEL}
       prompt-version: ${OPENAI_ANSWER_ANALYSIS_PROMPT_VERSION}
       max-output-tokens: ${OPENAI_ANSWER_ANALYSIS_MAX_OUTPUT_TOKENS:1000}
       timeout: ${OPENAI_ANSWER_ANALYSIS_TIMEOUT:60s}
+  feedback:
+    openai:
+      model: ${OPENAI_INTERVIEW_FEEDBACK_MODEL}
+      prompt-version: ${OPENAI_INTERVIEW_FEEDBACK_PROMPT_VERSION}
+      max-output-tokens: ${OPENAI_INTERVIEW_FEEDBACK_MAX_OUTPUT_TOKENS:2000}
+      timeout: ${OPENAI_INTERVIEW_FEEDBACK_TIMEOUT:90s}

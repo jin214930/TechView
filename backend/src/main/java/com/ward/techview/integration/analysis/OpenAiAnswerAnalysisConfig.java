@@ -1,6 +1,7 @@
 package com.ward.techview.integration.analysis;
 
 import com.ward.techview.evaluation.api.AnswerAnalysisProvider;
+import com.ward.techview.integration.openai.OpenAiClientProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -16,18 +17,22 @@ import java.net.http.HttpClient;
 @EnableConfigurationProperties(OpenAiAnswerAnalysisProperties.class)
 public class OpenAiAnswerAnalysisConfig {
     @Bean
-    public RestClient openAiAnswerAnalysisRestClient(RestClient.Builder builder, OpenAiAnswerAnalysisProperties properties) {
+    public RestClient openAiAnswerAnalysisRestClient(
+            RestClient.Builder builder,
+            OpenAiClientProperties clientProperties,
+            OpenAiAnswerAnalysisProperties analysisProperties
+    ) {
         HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(properties.timeout())
+                .connectTimeout(analysisProperties.timeout())
                 .build();
 
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
 
-        requestFactory.setReadTimeout(properties.timeout());
+        requestFactory.setReadTimeout(analysisProperties.timeout());
 
         return builder
-                .baseUrl(properties.baseUrl().toString())
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.apiKey())
+                .baseUrl(clientProperties.baseUrl().toString())
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + clientProperties.apiKey())
                 .requestFactory(requestFactory)
                 .build();
     }

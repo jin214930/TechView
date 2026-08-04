@@ -1,5 +1,6 @@
 package com.ward.techview.integration.stt;
 
+import com.ward.techview.integration.openai.OpenAiClientProperties;
 import com.ward.techview.voice.api.SpeechToTextProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -14,20 +15,23 @@ import java.net.http.HttpClient;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(OpenAiSttProperties.class)
 public class OpenAiSttConfig {
-
     @Bean
-    public RestClient openAiSttRestClient(RestClient.Builder builder, OpenAiSttProperties properties) {
+    public RestClient openAiSttRestClient(
+            RestClient.Builder builder,
+            OpenAiClientProperties clientProperties,
+            OpenAiSttProperties sttProperties
+    ) {
         HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(properties.timeout())
+                .connectTimeout(sttProperties.timeout())
                 .build();
 
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
 
-        requestFactory.setReadTimeout(properties.timeout());
+        requestFactory.setReadTimeout(sttProperties.timeout());
 
         return builder
-                .baseUrl(properties.baseUrl().toString())
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.apiKey())
+                .baseUrl(clientProperties.baseUrl().toString())
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + clientProperties.apiKey())
                 .requestFactory(requestFactory)
                 .build();
     }
