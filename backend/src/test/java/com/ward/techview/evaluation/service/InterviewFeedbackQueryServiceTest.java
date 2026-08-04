@@ -56,15 +56,23 @@ class InterviewFeedbackQueryServiceTest {
     @DisplayName("생성된 종합 피드백이 있으면 완료 응답을 반환한다")
     void returnsCompletedFeedbackWhenFeedbackExists() {
         InterviewFeedback feedback = feedback();
+        when(processingQuery.getStatus(SESSION_ID))
+                .thenReturn(new FinalFeedbackProcessingSnapshot(
+                        FinalFeedbackProcessingStatus.SUCCEEDED
+                ));
         when(interviewFeedbackRepository.findByInterviewSessionId(SESSION_ID))
                 .thenReturn(Optional.of(feedback));
 
         InterviewFeedbackResponse response = service.getFeedback(MEMBER_ID, SESSION_ID);
 
-        InOrder order = inOrder(interviewFeedbackAccessApi, interviewFeedbackRepository);
+        InOrder order = inOrder(
+                interviewFeedbackAccessApi,
+                processingQuery,
+                interviewFeedbackRepository
+        );
         order.verify(interviewFeedbackAccessApi).validateCompletedInterview(MEMBER_ID, SESSION_ID);
+        order.verify(processingQuery).getStatus(SESSION_ID);
         order.verify(interviewFeedbackRepository).findByInterviewSessionId(SESSION_ID);
-        verifyNoInteractions(processingQuery);
         assertAll(
                 () -> assertEquals(InterviewFeedbackStatus.COMPLETED, response.status()),
                 () -> assertEquals("전체 총평", response.feedback().overallSummary())
@@ -90,14 +98,27 @@ class InterviewFeedbackQueryServiceTest {
 
         assertAll(
                 () -> assertEquals(InterviewFeedbackStatus.FAILED, response.status()),
-                () -> assertEquals("피드백 생성 중 오류가 발생했습니다.", response.errorMessage())
+                () -> assertEquals("피드백을 제공할 수 없습니다.", response.errorMessage())
+        );
+    }
+
+    @Test
+    @DisplayName("피드백 작업이 없는 레거시 면접은 제공 불가 응답을 반환한다")
+    void returnsFailedWhenFeedbackJobWasNotStarted() {
+        prepareMissingFeedback(FinalFeedbackProcessingStatus.NOT_STARTED);
+
+        InterviewFeedbackResponse response = service.getFeedback(MEMBER_ID, SESSION_ID);
+
+        assertAll(
+                () -> assertEquals(InterviewFeedbackStatus.FAILED, response.status()),
+                () -> assertEquals("피드백을 제공할 수 없습니다.", response.errorMessage())
         );
     }
 
     @ParameterizedTest
     @EnumSource(
             value = FinalFeedbackProcessingStatus.class,
-            names = {"NOT_STARTED", "SUCCEEDED"}
+            names = "SUCCEEDED"
     )
     @DisplayName("피드백 데이터와 작업 상태가 일치하지 않으면 상태 오류로 처리한다")
     void rejectsInconsistentFeedbackState(FinalFeedbackProcessingStatus status) {

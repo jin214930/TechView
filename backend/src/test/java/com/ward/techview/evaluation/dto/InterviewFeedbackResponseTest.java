@@ -39,7 +39,7 @@ class InterviewFeedbackResponseTest {
                 () -> assertEquals(InterviewFeedbackStatus.FAILED, response.status()),
                 () -> assertNull(response.feedback()),
                 () -> assertEquals(
-                        "피드백 생성 중 오류가 발생했습니다.",
+                        "피드백을 제공할 수 없습니다.",
                         response.errorMessage()
                 )
         );

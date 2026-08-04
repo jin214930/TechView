@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 @ExtendWith(MockitoExtension.class)
 class InterviewFeedbackHistoryQueryServiceTest {
@@ -66,7 +68,7 @@ class InterviewFeedbackHistoryQueryServiceTest {
                 .thenReturn(interviews);
         when(interviewFeedbackRepository.findExistingInterviewSessionIds(Set.of(10L, 20L, 30L)))
                 .thenReturn(Set.of(10L));
-        when(processingQuery.getStatuses(Set.of(20L, 30L)))
+        when(processingQuery.getStatuses(Set.of(10L, 20L, 30L)))
                 .thenReturn(Map.of(
                         20L,
                         snapshot(FinalFeedbackProcessingStatus.PROCESSING),
@@ -89,9 +91,10 @@ class InterviewFeedbackHistoryQueryServiceTest {
                 () -> assertEquals(false, response.hasNext())
         );
 
-        verify(interviewFeedbackRepository)
+        InOrder order = inOrder(processingQuery, interviewFeedbackRepository);
+        order.verify(processingQuery).getStatuses(Set.of(10L, 20L, 30L));
+        order.verify(interviewFeedbackRepository)
                 .findExistingInterviewSessionIds(Set.of(10L, 20L, 30L));
-        verify(processingQuery).getStatuses(Set.of(20L, 30L));
     }
 
     @Test
@@ -116,7 +119,7 @@ class InterviewFeedbackHistoryQueryServiceTest {
     @ParameterizedTest
     @EnumSource(
             value = FinalFeedbackProcessingStatus.class,
-            names = {"NOT_STARTED", "SUCCEEDED"}
+            names = "SUCCEEDED"
     )
     @DisplayName("피드백 데이터와 작업 상태가 일치하지 않으면 상태 오류로 처리한다")
     void rejectsInconsistentFeedbackState(FinalFeedbackProcessingStatus status) {
@@ -136,6 +139,29 @@ class InterviewFeedbackHistoryQueryServiceTest {
         assertSame(
                 EvaluationResponseCode.INTERVIEW_FEEDBACK_STATE_INVALID,
                 exception.getResponseCode()
+        );
+    }
+
+    @Test
+    @DisplayName("피드백 작업이 없는 레거시 면접은 실패 상태로 반환한다")
+    void returnsFailedForLegacyInterviewWithoutFeedbackJob() {
+        Page<CompletedInterviewSummary> interviews = interviewPage(interview(10L));
+        when(interviewHistoryQueryApi.getCompletedInterviews(MEMBER_ID, 0, 10))
+                .thenReturn(interviews);
+        when(processingQuery.getStatuses(Set.of(10L)))
+                .thenReturn(Map.of(
+                        10L,
+                        snapshot(FinalFeedbackProcessingStatus.NOT_STARTED)
+                ));
+        when(interviewFeedbackRepository.findExistingInterviewSessionIds(Set.of(10L)))
+                .thenReturn(Set.of());
+
+        PageResponse<InterviewHistoryItemResponse> response =
+                service.getCompletedInterviews(MEMBER_ID, 0, 10);
+
+        assertEquals(
+                InterviewFeedbackStatus.FAILED,
+                response.items().getFirst().feedbackStatus()
         );
     }
 
