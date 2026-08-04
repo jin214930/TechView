@@ -1,5 +1,6 @@
 package com.ward.techview.evaluation.entity;
 
+import com.ward.techview.evaluation.api.FollowUpDecision;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

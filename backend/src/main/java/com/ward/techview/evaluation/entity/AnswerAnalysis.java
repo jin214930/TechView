@@ -1,6 +1,7 @@
 package com.ward.techview.evaluation.entity;
 
 import com.ward.techview.common.entity.BaseEntity;
+import com.ward.techview.evaluation.api.FollowUpDecision;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

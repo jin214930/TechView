@@ -1,4 +1,4 @@
-package com.ward.techview.evaluation.entity;
+package com.ward.techview.evaluation.api;
 
 public enum FollowUpDecision {
     ASK,
