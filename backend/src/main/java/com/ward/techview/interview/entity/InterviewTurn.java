@@ -109,4 +109,11 @@ public class InterviewTurn extends BaseEntity {
     public static InterviewTurn createFollowUp(InterviewSession session, int turnOrder, FollowUpQuestion followUpQuestion) {
         return new InterviewTurn(session, turnOrder, InterviewTurnType.FOLLOW_UP, null, followUpQuestion);
     }
+
+    public String getQuestionContent() {
+        return switch (turnType) {
+            case CORE -> interviewCoreQuestion.getContent();
+            case FOLLOW_UP -> followUpQuestion.getContent();
+        };
+    }
 }

@@ -37,4 +37,6 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
             WHERE session.id = :sessionId
             """)
     Optional<InterviewSession> findByIdForUpdate(@Param("sessionId") Long sessionId);
+
+    Optional<InterviewSession> findByIdAndMemberId(Long sessionId, Long memberId);
 }
