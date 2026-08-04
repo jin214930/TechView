@@ -32,18 +32,18 @@ public class InterviewFeedbackQueryService {
 
         interviewFeedbackAccessApi.validateCompletedInterview(memberId, interviewSessionId);
 
+        FinalFeedbackProcessingSnapshot snapshot = processingQuery.getStatus(interviewSessionId);
+
         Optional<InterviewFeedback> feedback = interviewFeedbackRepository.findByInterviewSessionId(interviewSessionId);
 
         if (feedback.isPresent()) {
             return InterviewFeedbackResponse.completed(feedback.get());
         }
 
-        FinalFeedbackProcessingSnapshot snapshot = processingQuery.getStatus(interviewSessionId);
-
         return switch (snapshot.status()) {
             case PROCESSING -> InterviewFeedbackResponse.processing(interviewSessionId);
-            case FAILED -> InterviewFeedbackResponse.failed(interviewSessionId);
-            case NOT_STARTED, SUCCEEDED ->
+            case NOT_STARTED, FAILED -> InterviewFeedbackResponse.failed(interviewSessionId);
+            case SUCCEEDED ->
                     throw new BusinessException(EvaluationResponseCode.INTERVIEW_FEEDBACK_STATE_INVALID);
         };
     }
