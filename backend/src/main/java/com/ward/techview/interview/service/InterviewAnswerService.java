@@ -2,10 +2,7 @@ package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.api.*;
-import com.ward.techview.interview.entity.Answer;
-import com.ward.techview.interview.entity.InterviewSession;
-import com.ward.techview.interview.entity.InterviewStatus;
-import com.ward.techview.interview.entity.InterviewTurn;
+import com.ward.techview.interview.entity.*;
 import com.ward.techview.interview.repository.AnswerRepository;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
@@ -74,6 +71,19 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         answer.completeTranscription(command.transcript(), command.transcribedAt());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public AnswerAnalysisContext getAnalysisContext(Long interviewSessionId, Long answerId) {
+        Answer answer = answerRepository.findAnalysisTarget(interviewSessionId, answerId)
+                .orElseThrow(() -> new BusinessException(InterviewResponseCode.ANSWER_NOT_FOUND));
+
+        if (!answer.isTranscribed()) {
+            throw new IllegalStateException("전사가 완료된 답변만 분석할 수 있습니다.");
+        }
+
+        return toAnalysisContext(answer);
+    }
+
     private PreparedAnswer createAnswer(InterviewTurn turn, AnswerCreateCommand command) {
         Answer answer = Answer.create(turn, command.audioObjectKey(), command.audioContentType(), command.audioDurationMs());
         answerRepository.save(answer);
@@ -120,6 +130,42 @@ public class InterviewAnswerService implements InterviewAnswerApi {
                 answer.getInterviewTurn().getSession().getId(),
                 answer.getAudioObjectKey(),
                 answer.getAudioContentType()
+        );
+    }
+
+    private AnswerAnalysisContext toAnalysisContext(Answer answer) {
+        InterviewTurn turn = answer.getInterviewTurn();
+
+        return switch (turn.getTurnType()) {
+            case CORE -> toCoreAnalysisContext(answer, turn);
+            case FOLLOW_UP -> toFollowUpAnalysisContext(answer, turn);
+        };
+    }
+
+    private AnswerAnalysisContext toCoreAnalysisContext(Answer answer, InterviewTurn turn) {
+        InterviewCoreQuestion coreQuestion = turn.getInterviewCoreQuestion();
+
+        return new AnswerAnalysisContext(
+                turn.getSession().getId(),
+                answer.getId(),
+                coreQuestion.getCategory(),
+                coreQuestion.getContent(),
+                null,
+                answer.getTranscript()
+        );
+    }
+
+    private AnswerAnalysisContext toFollowUpAnalysisContext(Answer answer, InterviewTurn turn) {
+        FollowUpQuestion followUpQuestion = turn.getFollowUpQuestion();
+        InterviewCoreQuestion coreQuestion = followUpQuestion.getCoreQuestion();
+
+        return new AnswerAnalysisContext(
+                turn.getSession().getId(),
+                answer.getId(),
+                coreQuestion.getCategory(),
+                coreQuestion.getContent(),
+                followUpQuestion.getContent(),
+                answer.getTranscript()
         );
     }
 }
