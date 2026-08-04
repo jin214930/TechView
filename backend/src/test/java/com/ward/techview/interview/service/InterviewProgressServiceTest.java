@@ -1,6 +1,7 @@
 package com.ward.techview.interview.service;
 
 import com.ward.techview.interview.api.InterviewAdvanceCommand;
+import com.ward.techview.interview.api.InterviewAdvanceResult;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.FollowUpQuestion;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
@@ -70,7 +71,7 @@ class InterviewProgressServiceTest {
         Answer answer = transcribedAnswer(turn);
         prepare(session, answer);
 
-        progressService.advanceAfterAnalysis(
+        InterviewAdvanceResult result = progressService.advanceAfterAnalysis(
                 new InterviewAdvanceCommand(SESSION_ID, ANSWER_ID, "추가로 설명해 주세요.", ANALYZED_AT)
         );
 
@@ -81,6 +82,7 @@ class InterviewProgressServiceTest {
         verify(interviewTurnRepository).save(turnCaptor.capture());
 
         assertAll(
+                () -> assertEquals(false, result.interviewCompleted()),
                 () -> assertEquals(2, session.getCurrentTurnOrder()),
                 () -> assertEquals("추가로 설명해 주세요.", questionCaptor.getValue().getContent()),
                 () -> assertEquals(InterviewTurnType.FOLLOW_UP, turnCaptor.getValue().getTurnType()),
@@ -100,13 +102,14 @@ class InterviewProgressServiceTest {
         when(coreQuestionRepository.findBySessionIdAndQuestionOrder(SESSION_ID, 2))
                 .thenReturn(Optional.of(nextQuestion));
 
-        progressService.advanceAfterAnalysis(
+        InterviewAdvanceResult result = progressService.advanceAfterAnalysis(
                 new InterviewAdvanceCommand(SESSION_ID, ANSWER_ID, null, ANALYZED_AT)
         );
 
         ArgumentCaptor<InterviewTurn> turnCaptor = ArgumentCaptor.forClass(InterviewTurn.class);
         verify(interviewTurnRepository).save(turnCaptor.capture());
         assertAll(
+                () -> assertEquals(false, result.interviewCompleted()),
                 () -> assertEquals(2, session.getCurrentTurnOrder()),
                 () -> assertEquals(InterviewTurnType.CORE, turnCaptor.getValue().getTurnType()),
                 () -> assertEquals(nextQuestion, turnCaptor.getValue().getInterviewCoreQuestion())
@@ -124,11 +127,12 @@ class InterviewProgressServiceTest {
         when(coreQuestionRepository.findBySessionIdAndQuestionOrder(SESSION_ID, 6))
                 .thenReturn(Optional.empty());
 
-        progressService.advanceAfterAnalysis(
+        InterviewAdvanceResult result = progressService.advanceAfterAnalysis(
                 new InterviewAdvanceCommand(SESSION_ID, ANSWER_ID, null, ANALYZED_AT)
         );
 
         assertAll(
+                () -> assertEquals(true, result.interviewCompleted()),
                 () -> assertEquals(InterviewStatus.COMPLETED, session.getStatus()),
                 () -> assertEquals(ANALYZED_AT, session.getCompletedAt())
         );
