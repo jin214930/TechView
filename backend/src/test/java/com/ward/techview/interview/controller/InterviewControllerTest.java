@@ -5,9 +5,12 @@ import com.ward.techview.common.exception.GlobalExceptionHandler;
 import com.ward.techview.common.response.ApiResponseAdvice;
 import com.ward.techview.common.security.CustomUserDetails;
 import com.ward.techview.interview.dto.ActiveInterviewResponse;
+import com.ward.techview.interview.dto.InterviewProgressResponse;
+import com.ward.techview.interview.dto.InterviewProgressStatus;
 import com.ward.techview.interview.dto.InterviewStartResponse;
 import com.ward.techview.interview.entity.InterviewTurnType;
 import com.ward.techview.interview.response.InterviewResponseCode;
+import com.ward.techview.interview.service.InterviewProgressQueryService;
 import com.ward.techview.interview.service.InterviewService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +48,9 @@ class InterviewControllerTest {
     @Mock
     private InterviewService interviewService;
 
+    @Mock
+    private InterviewProgressQueryService interviewProgressQueryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -53,7 +59,7 @@ class InterviewControllerTest {
                 new UsernamePasswordAuthenticationToken(PRINCIPAL, null, List.of())
         );
 
-        mockMvc = standaloneSetup(new InterviewController(interviewService))
+        mockMvc = standaloneSetup(new InterviewController(interviewService, interviewProgressQueryService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler(), new ApiResponseAdvice())
                 .build();
@@ -145,6 +151,38 @@ class InterviewControllerTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value(3000))
                 .andExpect(jsonPath("$.message").value("면접 진행 상태가 올바르지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("면접 진행 상태와 준비된 다음 질문을 반환한다")
+    void shouldReturnInterviewProgress() throws Exception {
+        InterviewProgressResponse response = new InterviewProgressResponse(
+                SESSION_ID,
+                InterviewProgressStatus.TURN_READY,
+                TURN_ID,
+                2,
+                InterviewTurnType.FOLLOW_UP,
+                "조금 더 구체적으로 설명해 주세요.",
+                null,
+                null
+        );
+        when(interviewProgressQueryService.getProgress(MEMBER_ID, SESSION_ID))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/interviews/{sessionId}/progress", SESSION_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("요청에 성공했습니다."))
+                .andExpect(jsonPath("$.data.sessionId").value(SESSION_ID))
+                .andExpect(jsonPath("$.data.status").value("TURN_READY"))
+                .andExpect(jsonPath("$.data.turnId").value(TURN_ID))
+                .andExpect(jsonPath("$.data.turnOrder").value(2))
+                .andExpect(jsonPath("$.data.turnType").value("FOLLOW_UP"))
+                .andExpect(jsonPath("$.data.question").value("조금 더 구체적으로 설명해 주세요."))
+                .andExpect(jsonPath("$.data.errorCode").doesNotExist())
+                .andExpect(jsonPath("$.data.errorMessage").doesNotExist());
+
+        verify(interviewProgressQueryService).getProgress(MEMBER_ID, SESSION_ID);
     }
 
     private static InterviewStartResponse startResponse(boolean resumed) {

@@ -18,14 +18,7 @@ public record InterviewStartResponse(
                 turn.getId(),
                 turn.getTurnOrder(),
                 turn.getTurnType(),
-                extractQuestion(turn)
+                turn.getQuestionContent()
         );
-    }
-
-    private static String extractQuestion(InterviewTurn turn) {
-        return switch (turn.getTurnType()) {
-            case CORE -> turn.getInterviewCoreQuestion().getContent();
-            case FOLLOW_UP -> turn.getFollowUpQuestion().getContent();
-        };
     }
 }
