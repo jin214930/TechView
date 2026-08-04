@@ -15,4 +15,6 @@ public interface ProcessingJobQueue {
     );
 
     ProcessingJobReceipt createOrGetAnswerAnalysisJob(Long interviewSessionId, Long answerId);
+
+    ProcessingJobReceipt createOrGetFinalFeedbackJob(Long interviewSessionId);
 }

@@ -5,14 +5,11 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
-import java.net.URI;
 import java.time.Duration;
 
 @Validated
 @ConfigurationProperties(prefix = "custom.stt.openai")
 public record OpenAiSttProperties(
-        @NotNull URI baseUrl,
-        @NotBlank String apiKey,
         @NotBlank String model,
         @NotBlank String language,
         @NotNull Duration timeout

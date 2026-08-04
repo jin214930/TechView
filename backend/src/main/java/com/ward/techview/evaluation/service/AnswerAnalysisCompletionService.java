@@ -4,9 +4,11 @@ import com.ward.techview.evaluation.api.AnswerAnalysisResult;
 import com.ward.techview.evaluation.entity.AnswerAnalysis;
 import com.ward.techview.evaluation.repository.AnswerAnalysisRepository;
 import com.ward.techview.interview.api.InterviewAdvanceCommand;
+import com.ward.techview.interview.api.InterviewAdvanceResult;
 import com.ward.techview.interview.api.InterviewProgressApi;
 import com.ward.techview.processing.api.AnswerAnalysisJobControl;
 import com.ward.techview.processing.api.ClaimedAnswerAnalysisJob;
+import com.ward.techview.processing.api.ProcessingJobQueue;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,7 @@ public class AnswerAnalysisCompletionService {
     private final AnswerAnalysisRepository answerAnalysisRepository;
     private final InterviewProgressApi interviewProgressApi;
     private final AnswerAnalysisJobControl jobControl;
+    private final ProcessingJobQueue processingJobQueue;
 
     @Transactional
     public void complete(ClaimedAnswerAnalysisJob job, AnswerAnalysisResult result) {
@@ -29,7 +32,7 @@ public class AnswerAnalysisCompletionService {
 
         saveAnalysis(job.answerId(), result);
 
-        interviewProgressApi.advanceAfterAnalysis(
+        InterviewAdvanceResult advanceResult = interviewProgressApi.advanceAfterAnalysis(
                 new InterviewAdvanceCommand(
                         job.interviewSessionId(),
                         job.answerId(),
@@ -37,6 +40,10 @@ public class AnswerAnalysisCompletionService {
                         OffsetDateTime.now(ZoneOffset.UTC)
                 )
         );
+
+        if (advanceResult.interviewCompleted()) {
+            processingJobQueue.createOrGetFinalFeedbackJob(job.interviewSessionId());
+        }
 
         succeedJob(job);
     }

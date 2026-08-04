@@ -1,11 +1,14 @@
 package com.ward.techview.processing.service;
 
 import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
+import com.ward.techview.processing.api.FinalFeedbackJobQueuedEvent;
 import com.ward.techview.processing.api.ProcessingJobReceipt;
 import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
 import com.ward.techview.processing.entity.AnswerAnalysisProcessingJob;
+import com.ward.techview.processing.entity.FinalFeedbackProcessingJob;
 import com.ward.techview.processing.entity.SttProcessingJob;
 import com.ward.techview.processing.repository.AnswerAnalysisProcessingJobRepository;
+import com.ward.techview.processing.repository.FinalFeedbackProcessingJobRepository;
 import com.ward.techview.processing.repository.SttProcessingJobRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +45,9 @@ class ProcessingJobServiceTest {
 
     @Mock
     private AnswerAnalysisProcessingJobRepository answerAnalysisProcessingJobRepository;
+
+    @Mock
+    private FinalFeedbackProcessingJobRepository finalFeedbackProcessingJobRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -150,6 +156,43 @@ class ProcessingJobServiceTest {
         assertEquals(PROCESSING_JOB_ID, eventCaptor.getValue().processingJobId());
     }
 
+    @Test
+    @DisplayName("기존 종합 피드백 작업이 있으면 해당 작업을 반환하고 이벤트를 발행하지 않는다")
+    void shouldReturnExistingFinalFeedbackJobWithoutPublishingEvent() {
+        FinalFeedbackProcessingJob existingJob = finalFeedbackProcessingJob();
+        when(finalFeedbackProcessingJobRepository.findByInterviewSessionId(SESSION_ID))
+                .thenReturn(Optional.of(existingJob));
+
+        ProcessingJobReceipt result = processingJobService.createOrGetFinalFeedbackJob(SESSION_ID);
+
+        assertReceipt(result);
+        verify(finalFeedbackProcessingJobRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("신규 종합 피드백 작업을 저장하고 작업 대기 이벤트를 발행한다")
+    void shouldCreateFinalFeedbackJobAndPublishQueuedEvent() {
+        when(finalFeedbackProcessingJobRepository.findByInterviewSessionId(SESSION_ID))
+                .thenReturn(Optional.empty());
+        when(finalFeedbackProcessingJobRepository.save(any(FinalFeedbackProcessingJob.class)))
+                .thenAnswer(invocation -> {
+                    FinalFeedbackProcessingJob job = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(job, "id", PROCESSING_JOB_ID);
+                    return job;
+                });
+
+        ProcessingJobReceipt result = processingJobService.createOrGetFinalFeedbackJob(SESSION_ID);
+
+        assertReceipt(result);
+        verify(finalFeedbackProcessingJobRepository).save(any(FinalFeedbackProcessingJob.class));
+
+        ArgumentCaptor<FinalFeedbackJobQueuedEvent> eventCaptor =
+                ArgumentCaptor.forClass(FinalFeedbackJobQueuedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(PROCESSING_JOB_ID, eventCaptor.getValue().processingJobId());
+    }
+
     private static SttProcessingJob processingJob() {
         SttProcessingJob job = SttProcessingJob.create(
                 SESSION_ID,
@@ -166,6 +209,15 @@ class ProcessingJobServiceTest {
         AnswerAnalysisProcessingJob job = AnswerAnalysisProcessingJob.create(
                 SESSION_ID,
                 ANSWER_ID,
+                OffsetDateTime.now(ZoneOffset.UTC)
+        );
+        ReflectionTestUtils.setField(job, "id", PROCESSING_JOB_ID);
+        return job;
+    }
+
+    private static FinalFeedbackProcessingJob finalFeedbackProcessingJob() {
+        FinalFeedbackProcessingJob job = FinalFeedbackProcessingJob.create(
+                SESSION_ID,
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
         ReflectionTestUtils.setField(job, "id", PROCESSING_JOB_ID);

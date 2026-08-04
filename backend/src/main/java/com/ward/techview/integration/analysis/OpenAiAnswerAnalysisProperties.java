@@ -6,14 +6,11 @@ import jakarta.validation.constraints.Positive;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
-import java.net.URI;
 import java.time.Duration;
 
 @Validated
 @ConfigurationProperties(prefix = "custom.analysis.openai")
 public record OpenAiAnswerAnalysisProperties(
-        @NotNull URI baseUrl,
-        @NotBlank String apiKey,
         @NotBlank String model,
         @NotBlank String promptVersion,
         @Positive int maxOutputTokens,

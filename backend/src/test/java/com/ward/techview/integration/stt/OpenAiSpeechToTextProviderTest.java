@@ -12,7 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-import java.net.URI;
 import java.time.Duration;
 
 import static org.hamcrest.Matchers.containsString;
@@ -30,6 +29,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class OpenAiSpeechToTextProviderTest {
 
+    private static final String BASE_URL = "https://api.openai.com";
+
     private MockRestServiceServer server;
     private OpenAiSpeechToTextProvider provider;
 
@@ -39,14 +40,12 @@ class OpenAiSpeechToTextProviderTest {
         server = MockRestServiceServer.bindTo(builder).build();
 
         OpenAiSttProperties properties = new OpenAiSttProperties(
-                URI.create("https://api.openai.com"),
-                "test-api-key",
                 "gpt-4o-mini-transcribe",
                 "ko",
                 Duration.ofSeconds(60)
         );
         provider = new OpenAiSpeechToTextProvider(
-                builder.baseUrl(properties.baseUrl().toString()).build(),
+                builder.baseUrl(BASE_URL).build(),
                 properties
         );
     }
@@ -54,7 +53,7 @@ class OpenAiSpeechToTextProviderTest {
     @Test
     @DisplayName("음성 파일과 STT 설정을 multipart 요청으로 전송한다")
     void transcribesAudioUsingMultipartRequest() {
-        server.expect(once(), requestTo("https://api.openai.com/v1/audio/transcriptions"))
+        server.expect(once(), requestTo(BASE_URL + "/v1/audio/transcriptions"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.MULTIPART_FORM_DATA))
                 .andExpect(content().string(containsString("name=\"file\"")))
