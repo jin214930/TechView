@@ -15,7 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -47,12 +46,9 @@ public class InterviewFeedbackHistoryQueryService {
                 .map(CompletedInterviewSummary::sessionId)
                 .collect(Collectors.toSet());
 
+        Map<Long, FinalFeedbackProcessingSnapshot> processingStatuses = processingQuery.getStatuses(sessionIds);
+
         Set<Long> completedFeedbackSessionIds = interviewFeedbackRepository.findExistingInterviewSessionIds(sessionIds);
-
-        Set<Long> sessionsWithoutFeedback = new HashSet<>(sessionIds);
-        sessionsWithoutFeedback.removeAll(completedFeedbackSessionIds);
-
-        Map<Long, FinalFeedbackProcessingSnapshot> processingStatuses = processingQuery.getStatuses(sessionsWithoutFeedback);
 
         return PageResponse.from(
                 interviews,
@@ -84,8 +80,8 @@ public class InterviewFeedbackHistoryQueryService {
 
         return switch (snapshot.status()) {
             case PROCESSING -> InterviewFeedbackStatus.PROCESSING;
-            case FAILED -> InterviewFeedbackStatus.FAILED;
-            case NOT_STARTED, SUCCEEDED ->
+            case NOT_STARTED, FAILED -> InterviewFeedbackStatus.FAILED;
+            case SUCCEEDED ->
                     throw new BusinessException(EvaluationResponseCode.INTERVIEW_FEEDBACK_STATE_INVALID);
         };
     }
