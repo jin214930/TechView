@@ -3,6 +3,7 @@ package com.ward.techview.processing.service;
 import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
 import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
 import com.ward.techview.processing.api.FinalFeedbackJobQueuedEvent;
+import com.ward.techview.processing.api.FinalFeedbackProcessingStatusChangedEvent;
 import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.AnswerAnalysisProcessingJob;
@@ -32,7 +33,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -157,8 +157,8 @@ class ProcessingJobPollingServiceTest {
     }
 
     @Test
-    @DisplayName("최종 피드백 작업의 lease 만료에는 답변 처리 상태 이벤트를 발행하지 않는다")
-    void doesNotPublishAnswerStatusEventForExhaustedFeedbackJob() {
+    @DisplayName("최종 피드백 작업의 lease가 최종 만료되면 피드백 상태 변경 이벤트를 발행한다")
+    void publishesFeedbackStatusEventForExhaustedFeedbackJob() {
         ProcessingJob exhaustedJob = exhaustedFeedbackJob(500L);
         when(processingJobRepository.findExhaustedExpiredJobs(
                 eq(ProcessingJobStatus.PROCESSING),
@@ -175,7 +175,13 @@ class ProcessingJobPollingServiceTest {
         pollingService.pollAndPublish();
 
         assertEquals(ProcessingJobStatus.FAILED, exhaustedJob.getStatus());
-        verify(eventPublisher, never()).publishEvent(any(Object.class));
+        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        FinalFeedbackProcessingStatusChangedEvent event = assertInstanceOf(
+                FinalFeedbackProcessingStatusChangedEvent.class,
+                eventCaptor.getValue()
+        );
+        assertEquals(10L, event.sessionId());
     }
 
     private static SttProcessingJob sttJob(Long id) {

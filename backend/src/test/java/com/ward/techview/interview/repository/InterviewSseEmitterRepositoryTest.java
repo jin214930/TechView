@@ -38,6 +38,23 @@ class InterviewSseEmitterRepositoryTest {
     }
 
     @Test
+    @DisplayName("동일 면접 세션의 모든 SSE 연결에 피드백 상태 변경을 전송한다")
+    void sendsFeedbackStatusChangedToEveryEmitterInSession() throws IOException {
+        SseEmitter firstEmitter = mock(SseEmitter.class);
+        SseEmitter secondEmitter = mock(SseEmitter.class);
+        SseEmitter otherSessionEmitter = mock(SseEmitter.class);
+        repository.add(SESSION_ID, firstEmitter);
+        repository.add(SESSION_ID, secondEmitter);
+        repository.add(20L, otherSessionEmitter);
+
+        repository.sendFeedbackStatusChanged(SESSION_ID);
+
+        verify(firstEmitter).send(any(SseEmitter.SseEventBuilder.class));
+        verify(secondEmitter).send(any(SseEmitter.SseEventBuilder.class));
+        verify(otherSessionEmitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
     @DisplayName("전송에 실패한 SSE 연결만 제거하고 나머지 연결에는 계속 전송한다")
     void removesOnlyFailedEmitter() throws IOException {
         SseEmitter failedEmitter = mock(SseEmitter.class);
