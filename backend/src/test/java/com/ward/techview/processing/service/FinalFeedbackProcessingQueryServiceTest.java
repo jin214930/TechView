@@ -17,10 +17,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -88,15 +94,79 @@ class FinalFeedbackProcessingQueryServiceTest {
         verifyNoInteractions(jobRepository);
     }
 
+    @Test
+    @DisplayName("여러 면접의 종합 피드백 작업 상태를 한 번에 반환한다")
+    void returnsStatusesForMultipleInterviews() {
+        Set<Long> sessionIds = Set.of(10L, 20L, 30L, 40L, 50L, 60L);
+        when(jobRepository.findAllByInterviewSessionIdIn(sessionIds))
+                .thenReturn(List.of(
+                        job(10L, ProcessingJobStatus.QUEUED),
+                        job(20L, ProcessingJobStatus.PROCESSING),
+                        job(30L, ProcessingJobStatus.RETRY_WAIT),
+                        job(40L, ProcessingJobStatus.SUCCEEDED),
+                        job(50L, ProcessingJobStatus.FAILED)
+                ));
+
+        Map<Long, FinalFeedbackProcessingSnapshot> result = service.getStatuses(sessionIds);
+
+        assertAll(
+                () -> assertEquals(FinalFeedbackProcessingStatus.PROCESSING, result.get(10L).status()),
+                () -> assertEquals(FinalFeedbackProcessingStatus.PROCESSING, result.get(20L).status()),
+                () -> assertEquals(FinalFeedbackProcessingStatus.PROCESSING, result.get(30L).status()),
+                () -> assertEquals(FinalFeedbackProcessingStatus.SUCCEEDED, result.get(40L).status()),
+                () -> assertEquals(FinalFeedbackProcessingStatus.FAILED, result.get(50L).status()),
+                () -> assertEquals(FinalFeedbackProcessingStatus.NOT_STARTED, result.get(60L).status()),
+                () -> assertThrows(
+                        UnsupportedOperationException.class,
+                        () -> result.put(
+                                70L,
+                                new FinalFeedbackProcessingSnapshot(FinalFeedbackProcessingStatus.NOT_STARTED)
+                        )
+                )
+        );
+
+        verify(jobRepository).findAllByInterviewSessionIdIn(sessionIds);
+    }
+
+    @Test
+    @DisplayName("면접 세션 ID 목록이 비어 있으면 작업 저장소를 조회하지 않는다")
+    void returnsEmptyStatusesWithoutQueryingRepository() {
+        Map<Long, FinalFeedbackProcessingSnapshot> result = service.getStatuses(Set.of());
+
+        assertEquals(Map.of(), result);
+        verifyNoInteractions(jobRepository);
+    }
+
+    @Test
+    @DisplayName("면접 세션 ID 목록 또는 목록의 원소가 null이면 작업 저장소를 조회하지 않는다")
+    void rejectsNullInterviewSessionIds() {
+        assertAll(
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> service.getStatuses(null)
+                ),
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> service.getStatuses(Collections.singleton(null))
+                )
+        );
+
+        verifyNoInteractions(jobRepository);
+    }
+
     private void prepareJob(ProcessingJobStatus status) {
         when(jobRepository.findByInterviewSessionId(SESSION_ID))
                 .thenReturn(Optional.of(job(status)));
     }
 
     private static FinalFeedbackProcessingJob job(ProcessingJobStatus status) {
+        return job(SESSION_ID, status);
+    }
+
+    private static FinalFeedbackProcessingJob job(Long sessionId, ProcessingJobStatus status) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         FinalFeedbackProcessingJob job = FinalFeedbackProcessingJob.create(
-                SESSION_ID,
+                sessionId,
                 now.minusMinutes(1)
         );
 
