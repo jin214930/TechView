@@ -1,11 +1,13 @@
 package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
+import com.ward.techview.interview.api.AnswerAnalysisContext;
 import com.ward.techview.interview.api.AnswerCreateCommand;
 import com.ward.techview.interview.api.AnswerInfo;
 import com.ward.techview.interview.api.AnswerTranscriptionCommand;
 import com.ward.techview.interview.api.PreparedAnswer;
 import com.ward.techview.interview.entity.Answer;
+import com.ward.techview.interview.entity.FollowUpQuestion;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.entity.InterviewStatus;
@@ -29,8 +31,11 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -354,6 +359,109 @@ class InterviewAnswerServiceTest {
         verify(answerRepository).findByIdAndSessionIdForUpdate(ANSWER_ID, SESSION_ID);
     }
 
+    @Test
+    @DisplayName("전사된 핵심 질문 답변의 분석 문맥을 반환한다")
+    void shouldGetCoreAnswerAnalysisContext() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
+        InterviewTurn turn = turn(session, 1);
+        Answer answer = transcribedAnswer(
+                turn,
+                "다형성은 하나의 타입으로 여러 구현을 다루는 특성입니다."
+        );
+        when(answerRepository.findAnalysisTarget(SESSION_ID, ANSWER_ID))
+                .thenReturn(Optional.of(answer));
+
+        AnswerAnalysisContext result = interviewAnswerService.getAnalysisContext(
+                SESSION_ID,
+                ANSWER_ID
+        );
+
+        assertAll(
+                () -> assertEquals(SESSION_ID, result.interviewSessionId()),
+                () -> assertEquals(ANSWER_ID, result.answerId()),
+                () -> assertEquals("JAVA", result.category()),
+                () -> assertEquals("자바의 다형성을 설명해 주세요.", result.coreQuestion()),
+                () -> assertNull(result.followUpQuestion()),
+                () -> assertEquals(
+                        "다형성은 하나의 타입으로 여러 구현을 다루는 특성입니다.",
+                        result.transcript()
+                ),
+                () -> assertTrue(result.followUpAllowed())
+        );
+    }
+
+    @Test
+    @DisplayName("전사된 꼬리 질문 답변에 원본 핵심 질문을 포함한 분석 문맥을 반환한다")
+    void shouldGetFollowUpAnswerAnalysisContext() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 2);
+        InterviewTurn turn = followUpTurn(session, 2);
+        Answer answer = transcribedAnswer(
+                turn,
+                "오버라이딩을 통해 실행 시점에 실제 구현이 선택됩니다."
+        );
+        when(answerRepository.findAnalysisTarget(SESSION_ID, ANSWER_ID))
+                .thenReturn(Optional.of(answer));
+
+        AnswerAnalysisContext result = interviewAnswerService.getAnalysisContext(
+                SESSION_ID,
+                ANSWER_ID
+        );
+
+        assertAll(
+                () -> assertEquals("JAVA", result.category()),
+                () -> assertEquals("자바의 다형성을 설명해 주세요.", result.coreQuestion()),
+                () -> assertEquals(
+                        "다형성이 실제로 동작하는 예를 설명해 주세요.",
+                        result.followUpQuestion()
+                ),
+                () -> assertEquals(
+                        "오버라이딩을 통해 실행 시점에 실제 구현이 선택됩니다.",
+                        result.transcript()
+                ),
+                () -> assertFalse(result.followUpAllowed())
+        );
+    }
+
+    @Test
+    @DisplayName("전사되지 않은 답변은 분석 문맥을 조회할 수 없다")
+    void shouldRejectAnalysisContextWhenAnswerIsNotTranscribed() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
+        Answer answer = Answer.create(
+                turn(session, 1),
+                OBJECT_KEY,
+                CONTENT_TYPE,
+                DURATION_MS
+        );
+        ReflectionTestUtils.setField(answer, "id", ANSWER_ID);
+        when(answerRepository.findAnalysisTarget(SESSION_ID, ANSWER_ID))
+                .thenReturn(Optional.of(answer));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> interviewAnswerService.getAnalysisContext(
+                        SESSION_ID,
+                        ANSWER_ID
+                )
+        );
+    }
+
+    @Test
+    @DisplayName("면접 세션에 속한 답변이 없으면 분석 문맥을 조회할 수 없다")
+    void shouldRejectAnalysisContextWhenAnswerDoesNotExistInSession() {
+        when(answerRepository.findAnalysisTarget(SESSION_ID, ANSWER_ID))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> interviewAnswerService.getAnalysisContext(
+                        SESSION_ID,
+                        ANSWER_ID
+                )
+        );
+
+        assertSame(InterviewResponseCode.ANSWER_NOT_FOUND, exception.getResponseCode());
+    }
+
     private static AnswerCreateCommand command() {
         return new AnswerCreateCommand(
                 MEMBER_ID,
@@ -389,5 +497,51 @@ class InterviewAnswerServiceTest {
         InterviewTurn turn = InterviewTurn.createCore(session, turnOrder, coreQuestion);
         ReflectionTestUtils.setField(turn, "id", TURN_ID);
         return turn;
+    }
+
+    private static InterviewTurn followUpTurn(
+            InterviewSession session,
+            int turnOrder
+    ) {
+        InterviewCoreQuestion coreQuestion = InterviewCoreQuestion.create(
+                session,
+                1L,
+                "자바의 다형성을 설명해 주세요.",
+                "JAVA",
+                1
+        );
+        ReflectionTestUtils.setField(coreQuestion, "id", 20L);
+
+        FollowUpQuestion followUpQuestion = FollowUpQuestion.create(
+                coreQuestion,
+                "다형성이 실제로 동작하는 예를 설명해 주세요."
+        );
+        ReflectionTestUtils.setField(followUpQuestion, "id", 30L);
+
+        InterviewTurn turn = InterviewTurn.createFollowUp(
+                session,
+                turnOrder,
+                followUpQuestion
+        );
+        ReflectionTestUtils.setField(turn, "id", TURN_ID);
+        return turn;
+    }
+
+    private static Answer transcribedAnswer(
+            InterviewTurn turn,
+            String transcript
+    ) {
+        Answer answer = Answer.create(
+                turn,
+                OBJECT_KEY,
+                CONTENT_TYPE,
+                DURATION_MS
+        );
+        ReflectionTestUtils.setField(answer, "id", ANSWER_ID);
+        answer.completeTranscription(
+                transcript,
+                OffsetDateTime.now(ZoneOffset.UTC)
+        );
+        return answer;
     }
 }
