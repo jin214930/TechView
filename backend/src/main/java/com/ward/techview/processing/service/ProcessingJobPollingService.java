@@ -1,11 +1,13 @@
 package com.ward.techview.processing.service;
 
 import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
+import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
 import com.ward.techview.processing.api.FinalFeedbackJobQueuedEvent;
 import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.ProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
+import com.ward.techview.processing.entity.ProcessingJobType;
 import com.ward.techview.processing.repository.ProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -51,10 +53,16 @@ public class ProcessingJobPollingService {
                 limit
         );
 
-        exhaustedJobs.forEach(job -> job.fail(
-                "WORKER_LEASE_EXPIRED",
-                "최대 시도 횟수에서 작업 처리 lease가 만료되었습니다."
-        ));
+        exhaustedJobs.forEach(job -> {
+            job.fail(
+                    "WORKER_LEASE_EXPIRED",
+                    "최대 시도 횟수에서 작업 처리 lease가 만료되었습니다."
+            );
+
+            if (job.getJobType() == ProcessingJobType.STT_TRANSCRIPTION || job.getJobType() == ProcessingJobType.ANSWER_ANALYSIS) {
+                eventPublisher.publishEvent(new AnswerProcessingStatusChangedEvent(job.getInterviewSessionId()));
+            }
+        });
     }
 
     private void publishDispatchEvent(ProcessingJob job) {
