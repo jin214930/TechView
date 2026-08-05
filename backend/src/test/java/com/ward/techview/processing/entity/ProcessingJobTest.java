@@ -304,6 +304,34 @@ class ProcessingJobTest {
         assertFalse(job.isCurrentAttempt(1));
     }
 
+    @Test
+    @DisplayName("처리 lease가 남아 있는 작업은 현재 실행 중인 것으로 판단한다")
+    void recognizesActivelyProcessingJob() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+
+        assertTrue(job.isActivelyProcessing(QUEUED_AT.plusSeconds(30)));
+    }
+
+    @Test
+    @DisplayName("처리 lease가 만료됐거나 처리 중 상태가 아니면 현재 실행 중이 아니다")
+    void rejectsInactiveOrExpiredProcessingJob() {
+        SttProcessingJob queuedJob = createJob(QUEUED_AT);
+        SttProcessingJob expiredJob = createJob(QUEUED_AT);
+        expiredJob.claim(QUEUED_AT, LEASE_DURATION);
+
+        assertAll(
+                () -> assertFalse(queuedJob.isActivelyProcessing(QUEUED_AT)),
+                () -> assertFalse(expiredJob.isActivelyProcessing(
+                        QUEUED_AT.plus(LEASE_DURATION)
+                )),
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> expiredJob.isActivelyProcessing(null)
+                )
+        );
+    }
+
     private static SttProcessingJob createJob(OffsetDateTime queuedAt) {
         return SttProcessingJob.create(
                 SESSION_ID,

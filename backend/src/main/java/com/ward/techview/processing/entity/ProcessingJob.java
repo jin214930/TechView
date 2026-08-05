@@ -180,6 +180,12 @@ public abstract class ProcessingJob extends BaseEntity {
         return status == ProcessingJobStatus.PROCESSING && attemptCount == expectedAttemptCount;
     }
 
+    public boolean isActivelyProcessing(OffsetDateTime now) {
+        Objects.requireNonNull(now, "현재 시각은 필수입니다.");
+
+        return status == ProcessingJobStatus.PROCESSING && leaseExpiresAt != null && leaseExpiresAt.isAfter(now);
+    }
+
     private void validateProcessing() {
         if (status != ProcessingJobStatus.PROCESSING) {
             throw new IllegalStateException("처리 중인 작업만 상태를 변경할 수 있습니다.");

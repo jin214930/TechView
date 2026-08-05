@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface AnswerRepository extends JpaRepository<Answer, Long> {
     Optional<Answer> findByInterviewTurnId(Long interviewTurnId);
@@ -69,4 +70,11 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
             ORDER BY turn.turnOrder
             """)
     List<Answer> findAllFeedbackTargets(@Param("interviewSessionId") Long interviewSessionId);
+
+    @Query("""
+            select answer.audioObjectKey
+            from Answer answer
+            where answer.audioObjectKey in :objectKeys
+            """)
+    Set<String> findReferencedAudioObjectKeys(@Param("objectKeys") Set<String> objectKeys);
 }

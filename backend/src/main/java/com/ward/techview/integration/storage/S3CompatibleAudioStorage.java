@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 
 import java.net.URI;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -100,6 +101,47 @@ public class S3CompatibleAudioStorage implements AudioStorage {
         deleteObject(objectKey, request);
     }
 
+    @Override
+    public StoredAudioObjectPage listObjects(String prefix, String continuationToken, int limit) {
+        validateListObjectsRequest(prefix, continuationToken, limit);
+
+        ListObjectsV2Request.Builder requestBuilder = ListObjectsV2Request.builder()
+                .bucket(properties.bucket())
+                .prefix(prefix)
+                .maxKeys(limit);
+
+        if (continuationToken != null) {
+            requestBuilder.continuationToken(continuationToken);
+        }
+
+        try {
+            ListObjectsV2Response response = s3Client.listObjectsV2(requestBuilder.build());
+
+            List<StoredAudioObject> objects = response.contents()
+                    .stream()
+                    .map(object -> new StoredAudioObject(
+                            object.key(),
+                            object.eTag(),
+                            object.lastModified().atOffset(ZoneOffset.UTC)
+                    ))
+                    .toList();
+
+            String nextContinuationToken = Boolean.TRUE.equals(response.isTruncated())
+                    ? response.nextContinuationToken()
+                    : null;
+
+            return new StoredAudioObjectPage(objects, nextContinuationToken);
+        } catch (S3Exception exception) {
+            throw mapStorageException(prefix, exception);
+        } catch (SdkClientException exception) {
+            throw new AudioStorageException(
+                    AudioStorageFailure.TEMPORARY_FAILURE,
+                    "음성 저장소의 객체 목록을 조회할 수 없습니다.",
+                    exception
+            );
+        }
+    }
+
     private AudioStorageException mapStorageException(String objectKey, S3Exception exception) {
         AudioStorageFailure failure = switch (exception.statusCode()) {
             case 404 -> AudioStorageFailure.OBJECT_NOT_FOUND;
@@ -123,6 +165,20 @@ public class S3CompatibleAudioStorage implements AudioStorage {
             throw mapStorageException(objectKey, exception);
         } catch (SdkClientException exception) {
             throw new AudioStorageException(AudioStorageFailure.TEMPORARY_FAILURE, "음성 객체를 삭제할 수 없습니다.", exception);
+        }
+    }
+
+    private void validateListObjectsRequest(String prefix, String continuationToken, int limit) {
+        if (prefix == null || prefix.isBlank()) {
+            throw new IllegalArgumentException("조회할 객체 접두사는 필수입니다.");
+        }
+
+        if (continuationToken != null && continuationToken.isBlank()) {
+            throw new IllegalArgumentException("페이지 토큰은 비어 있을 수 없습니다.");
+        }
+
+        if (limit <= 0 || limit > 1_000) {
+            throw new IllegalArgumentException("객체 조회 개수는 1 이상 1000 이하여야 합니다.");
         }
     }
 }

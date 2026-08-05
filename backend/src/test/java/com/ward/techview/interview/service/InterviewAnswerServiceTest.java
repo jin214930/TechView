@@ -15,6 +15,7 @@ import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
 import com.ward.techview.interview.response.InterviewResponseCode;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,7 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,8 +60,19 @@ class InterviewAnswerServiceTest {
     @Mock
     private AnswerRepository answerRepository;
 
+    @Mock
+    private InterviewRetentionPolicy retentionPolicy;
+
     @InjectMocks
     private InterviewAnswerService interviewAnswerService;
+
+    @BeforeEach
+    void setUpRetentionPolicy() {
+        lenient().when(retentionPolicy.isExpired(
+                any(InterviewSession.class),
+                any(OffsetDateTime.class)
+        )).thenReturn(false);
+    }
 
     @Test
     @DisplayName("회원의 진행 중인 현재 턴에 답변을 생성한다")
@@ -117,6 +131,25 @@ class InterviewAnswerServiceTest {
         InterviewSession session = session(InterviewStatus.COMPLETED, 1);
         when(interviewSessionRepository.findByIdAndMemberIdForUpdate(SESSION_ID, MEMBER_ID))
                 .thenReturn(Optional.of(session));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> interviewAnswerService.prepareAnswer(command())
+        );
+
+        assertSame(InterviewResponseCode.INTERVIEW_NOT_IN_PROGRESS, exception.getResponseCode());
+        verify(interviewTurnRepository, never()).findByIdAndSessionId(any(), any());
+        verify(answerRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("만료된 진행 중 면접에는 답변을 생성하지 않는다")
+    void shouldRejectAnswerCreationForExpiredInterview() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
+        when(interviewSessionRepository.findByIdAndMemberIdForUpdate(SESSION_ID, MEMBER_ID))
+                .thenReturn(Optional.of(session));
+        when(retentionPolicy.isExpired(eq(session), any(OffsetDateTime.class)))
+                .thenReturn(true);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -243,6 +276,27 @@ class InterviewAnswerServiceTest {
     }
 
     @Test
+    @DisplayName("완료된 면접에서도 회원 소유의 답변 정보를 조회한다")
+    void shouldGetOwnedAnswerInfoFromCompletedInterview() {
+        InterviewSession session = session(InterviewStatus.COMPLETED, 1);
+        InterviewTurn turn = turn(session, 1);
+        Answer answer = Answer.create(turn, OBJECT_KEY, CONTENT_TYPE, DURATION_MS);
+        ReflectionTestUtils.setField(answer, "id", ANSWER_ID);
+        when(answerRepository.findByIdAndMemberId(ANSWER_ID, MEMBER_ID))
+                .thenReturn(Optional.of(answer));
+
+        AnswerInfo result = interviewAnswerService.getAnswer(MEMBER_ID, ANSWER_ID);
+
+        assertAll(
+                () -> assertEquals(ANSWER_ID, result.answerId()),
+                () -> assertEquals(SESSION_ID, result.interviewSessionId()),
+                () -> assertEquals(OBJECT_KEY, result.audioObjectKey()),
+                () -> assertEquals(CONTENT_TYPE, result.audioContentType())
+        );
+        verify(retentionPolicy, never()).isExpired(any(), any());
+    }
+
+    @Test
     @DisplayName("회원 소유의 답변이 없으면 조회를 거부한다")
     void shouldRejectWhenOwnedAnswerDoesNotExist() {
         when(answerRepository.findByIdAndMemberId(ANSWER_ID, MEMBER_ID))
@@ -332,6 +386,28 @@ class InterviewAnswerServiceTest {
                 () -> assertEquals(transcribedAt, answer.getTranscribedAt())
         );
         verify(answerRepository).findByIdAndSessionIdForUpdate(ANSWER_ID, SESSION_ID);
+    }
+
+    @Test
+    @DisplayName("만료된 면접의 답변은 STT 작업 등록을 위해 잠글 수 없다")
+    void shouldRejectProcessingLockForExpiredInterview() {
+        InterviewSession session = session(InterviewStatus.IN_PROGRESS, 1);
+        when(interviewSessionRepository.findByIdAndMemberIdForUpdate(SESSION_ID, MEMBER_ID))
+                .thenReturn(Optional.of(session));
+        when(retentionPolicy.isExpired(eq(session), any(OffsetDateTime.class)))
+                .thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> interviewAnswerService.lockAnswerForProcessing(
+                        MEMBER_ID,
+                        SESSION_ID,
+                        ANSWER_ID
+                )
+        );
+
+        assertSame(InterviewResponseCode.INTERVIEW_NOT_IN_PROGRESS, exception.getResponseCode());
+        verify(answerRepository, never()).findByIdAndSessionId(any(), any());
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.ward.techview.voice.api.AudioObjectMetadata;
 import com.ward.techview.voice.api.AudioStorageException;
 import com.ward.techview.voice.api.AudioStorageFailure;
 import com.ward.techview.voice.api.PresignedUpload;
+import com.ward.techview.voice.api.StoredAudioObjectPage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,11 +22,15 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -294,6 +299,96 @@ class S3CompatibleAudioStorageTest {
     @DisplayName("음성 삭제 대상 ETag가 다르면 버전 불일치 오류로 변환한다")
     void shouldMapVersionMismatchWhenDeletingAudioObject() {
         assertDeleteFailure(412, AudioStorageFailure.VERSION_MISMATCH);
+    }
+
+    @Test
+    @DisplayName("S3 객체 목록과 다음 페이지 토큰을 반환한다")
+    void shouldListAudioObjectsWithContinuationToken() {
+        Instant lastModified = Instant.parse("2026-08-01T00:00:00Z");
+        ListObjectsV2Response response = ListObjectsV2Response.builder()
+                .contents(S3Object.builder()
+                        .key("interviews/10/turns/100/audio-key")
+                        .eTag("audio-etag")
+                        .lastModified(lastModified)
+                        .build())
+                .isTruncated(true)
+                .nextContinuationToken("next-token")
+                .build();
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenReturn(response);
+
+        StoredAudioObjectPage result = audioStorage.listObjects(
+                "interviews/",
+                "current-token",
+                100
+        );
+
+        assertAll(
+                () -> assertEquals(1, result.objects().size()),
+                () -> assertEquals(
+                        "interviews/10/turns/100/audio-key",
+                        result.objects().getFirst().objectKey()
+                ),
+                () -> assertEquals("audio-etag", result.objects().getFirst().etag()),
+                () -> assertEquals(
+                        lastModified.atOffset(ZoneOffset.UTC),
+                        result.objects().getFirst().lastModifiedAt()
+                ),
+                () -> assertEquals("next-token", result.nextContinuationToken()),
+                () -> assertTrue(result.hasNext())
+        );
+
+        ArgumentCaptor<ListObjectsV2Request> requestCaptor =
+                ArgumentCaptor.forClass(ListObjectsV2Request.class);
+        verify(s3Client).listObjectsV2(requestCaptor.capture());
+        ListObjectsV2Request request = requestCaptor.getValue();
+        assertAll(
+                () -> assertEquals("techview-audio", request.bucket()),
+                () -> assertEquals("interviews/", request.prefix()),
+                () -> assertEquals("current-token", request.continuationToken()),
+                () -> assertEquals(100, request.maxKeys())
+        );
+    }
+
+    @Test
+    @DisplayName("마지막 S3 객체 페이지에는 다음 페이지 토큰을 반환하지 않는다")
+    void shouldReturnNoContinuationTokenForLastPage() {
+        ListObjectsV2Response response = ListObjectsV2Response.builder()
+                .contents(java.util.List.of())
+                .isTruncated(false)
+                .build();
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenReturn(response);
+
+        StoredAudioObjectPage result = audioStorage.listObjects(
+                "interviews/",
+                null,
+                100
+        );
+
+        assertAll(
+                () -> assertTrue(result.objects().isEmpty()),
+                () -> assertFalse(result.hasNext())
+        );
+    }
+
+    @Test
+    @DisplayName("S3 객체 목록 조회의 일시적 오류를 저장소 예외로 변환한다")
+    void shouldMapTemporaryFailureWhenListingAudioObjects() {
+        S3Exception storageFailure = mock(S3Exception.class);
+        when(storageFailure.statusCode()).thenReturn(503);
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenThrow(storageFailure);
+
+        AudioStorageException exception = assertThrows(
+                AudioStorageException.class,
+                () -> audioStorage.listObjects("interviews/", null, 100)
+        );
+
+        assertAll(
+                () -> assertSame(AudioStorageFailure.TEMPORARY_FAILURE, exception.getFailure()),
+                () -> assertSame(storageFailure, exception.getCause())
+        );
     }
 
     private void assertDeleteFailure(

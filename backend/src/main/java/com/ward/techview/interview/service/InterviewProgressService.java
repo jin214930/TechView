@@ -18,6 +18,7 @@ public class InterviewProgressService implements InterviewProgressApi {
     private final InterviewCoreQuestionRepository coreQuestionRepository;
     private final FollowUpQuestionRepository followUpQuestionRepository;
     private final InterviewTurnRepository interviewTurnRepository;
+    private final InterviewRetentionPolicy retentionPolicy;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -25,6 +26,10 @@ public class InterviewProgressService implements InterviewProgressApi {
         InterviewSession session = interviewSessionRepository
                 .findByIdForUpdate(command.interviewSessionId())
                 .orElseThrow(() -> new IllegalArgumentException("면접 세션을 찾을 수 없습니다."));
+
+        if (retentionPolicy.isExpired(session, command.analyzedAt())) {
+            throw new IllegalStateException("만료된 면접 세션은 진행할 수 없습니다.");
+        }
 
         Answer answer = answerRepository.findByIdAndSessionIdForUpdate(command.answerId(), session.getId())
                 .orElseThrow(() -> new IllegalArgumentException("분석 대상 답변을 찾을 수 없습니다."));

@@ -57,4 +57,13 @@ public interface ProcessingJobRepository extends JpaRepository<ProcessingJob, Lo
             OffsetDateTime now,
             Pageable pageable
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT job
+            FROM ProcessingJob job
+            WHERE job.interviewSessionId = :interviewSessionId
+            ORDER BY job.id
+            """)
+    List<ProcessingJob> findAllByInterviewSessionIdForUpdate(@Param("interviewSessionId") Long interviewSessionId);
 }

@@ -12,12 +12,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 @Service
 @RequiredArgsConstructor
 public class InterviewAnswerService implements InterviewAnswerApi {
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewTurnRepository interviewTurnRepository;
     private final AnswerRepository answerRepository;
+    private final InterviewRetentionPolicy retentionPolicy;
 
     @Override
     @Transactional
@@ -25,7 +29,7 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         InterviewSession session = interviewSessionRepository.findByIdAndMemberIdForUpdate(command.sessionId(), command.memberId())
                 .orElseThrow(() -> new BusinessException(InterviewResponseCode.INTERVIEW_NOT_FOUND));
 
-        validateInProgress(session);
+        validateAvailable(session, OffsetDateTime.now(ZoneOffset.UTC));
 
         InterviewTurn turn = interviewTurnRepository.findByIdAndSessionId(command.turnId(), session.getId())
                 .orElseThrow(() -> new BusinessException(InterviewResponseCode.INTERVIEW_TURN_NOT_FOUND));
@@ -52,7 +56,7 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         InterviewSession session = interviewSessionRepository.findByIdAndMemberIdForUpdate(interviewSessionId, memberId)
                 .orElseThrow(() -> new BusinessException(InterviewResponseCode.INTERVIEW_NOT_FOUND));
 
-        validateInProgress(session);
+        validateAvailable(session, OffsetDateTime.now(ZoneOffset.UTC));
 
         Answer answer = answerRepository.findByIdAndSessionId(answerId, session.getId())
                 .orElseThrow(() -> new BusinessException(InterviewResponseCode.ANSWER_NOT_FOUND));
@@ -96,8 +100,9 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         );
     }
 
-    private void validateInProgress(InterviewSession session) {
-        if (session.getStatus() != InterviewStatus.IN_PROGRESS) {
+    private void validateAvailable(InterviewSession session, OffsetDateTime now) {
+        if (session.getStatus() != InterviewStatus.IN_PROGRESS
+                || retentionPolicy.isExpired(session, now)) {
             throw new BusinessException(InterviewResponseCode.INTERVIEW_NOT_IN_PROGRESS);
         }
     }

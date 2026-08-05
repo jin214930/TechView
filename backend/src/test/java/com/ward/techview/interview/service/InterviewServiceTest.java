@@ -16,6 +16,7 @@ import com.ward.techview.interview.response.InterviewResponseCode;
 import com.ward.techview.question.api.QuestionSelector;
 import com.ward.techview.question.api.SelectedQuestion;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -67,8 +68,19 @@ class InterviewServiceTest {
     @Mock
     private QuestionSelector questionSelector;
 
+    @Mock
+    private InterviewRetentionPolicy retentionPolicy;
+
     @InjectMocks
     private InterviewService interviewService;
+
+    @BeforeEach
+    void setUpRetentionPolicy() {
+        when(retentionPolicy.calculateCutoff(any(OffsetDateTime.class)))
+                .thenAnswer(invocation -> invocation
+                        .<OffsetDateTime>getArgument(0)
+                        .minusDays(30));
+    }
 
     @Test
     @DisplayName("30일 이내 진행 중인 면접 세션을 반환한다")

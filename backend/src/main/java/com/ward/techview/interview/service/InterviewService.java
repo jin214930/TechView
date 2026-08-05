@@ -26,7 +26,6 @@ import java.util.stream.IntStream;
 @Service
 @RequiredArgsConstructor
 public class InterviewService {
-    private static final long ACTIVE_SESSION_RETENTION_DAYS = 30;
     private static final int CORE_QUESTION_COUNT = 5;
 
     private final InterviewSessionRepository interviewSessionRepository;
@@ -34,10 +33,12 @@ public class InterviewService {
     private final InterviewTurnRepository interviewTurnRepository;
     private final MemberLockManager memberLockManager;
     private final QuestionSelector questionSelector;
+    private final InterviewRetentionPolicy retentionPolicy;
 
     @Transactional(readOnly = true)
     public ActiveInterviewResponse getActiveSession(Long memberId) {
-        OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusDays(ACTIVE_SESSION_RETENTION_DAYS);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime cutoff = retentionPolicy.calculateCutoff(now);
 
         return interviewSessionRepository.findActiveSession(memberId, InterviewStatus.IN_PROGRESS, cutoff)
                 .map(ActiveInterviewResponse::from)
@@ -49,7 +50,7 @@ public class InterviewService {
         memberLockManager.lock(memberId);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        OffsetDateTime cutoff = now.minusDays(ACTIVE_SESSION_RETENTION_DAYS);
+        OffsetDateTime cutoff = retentionPolicy.calculateCutoff(now);
 
         return interviewSessionRepository.findActiveSession(memberId, InterviewStatus.IN_PROGRESS, cutoff)
                 .map(this::resume)

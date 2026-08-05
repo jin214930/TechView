@@ -56,10 +56,7 @@ public class FailedAudioCleanupService {
 
     private boolean delete(FailedAudioCleanupTarget target) {
         try {
-            audioStorage.delete(
-                    target.audioObjectKey(),
-                    target.sourceObjectEtag()
-            );
+            audioStorage.delete(target.audioObjectKey(), target.sourceObjectEtag());
         } catch (AudioStorageException exception) {
             log.warn(
                     "실패 음성 객체 정리에 실패했습니다. processingJobId={}, objectKey={}, failure={}",
