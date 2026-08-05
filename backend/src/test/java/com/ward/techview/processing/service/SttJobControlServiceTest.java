@@ -262,7 +262,8 @@ class SttJobControlServiceTest {
                 () -> assertEquals(nextAttemptAt, job.getNextAttemptAt()),
                 () -> assertNull(job.getLeaseExpiresAt()),
                 () -> assertEquals("STT_TIMEOUT", job.getErrorCode()),
-                () -> assertEquals("STT 요청 시간이 초과되었습니다.", job.getErrorMessage())
+                () -> assertEquals("STT 요청 시간이 초과되었습니다.", job.getErrorMessage()),
+                () -> assertNull(job.getAudioCleanupDueAt())
         );
         verifyNoInteractions(eventPublisher);
     }
@@ -270,6 +271,7 @@ class SttJobControlServiceTest {
     @Test
     @DisplayName("현재 시도의 STT 작업을 최종 실패 상태로 변경한다")
     void failsCurrentAttempt() {
+        OffsetDateTime beforeFailure = OffsetDateTime.now(ZoneOffset.UTC);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         SttProcessingJob job = createJob(now.minusMinutes(1));
         job.claim(now, LEASE_DURATION);
@@ -282,13 +284,18 @@ class SttJobControlServiceTest {
                 "INVALID_AUDIO",
                 "지원하지 않는 음성 파일입니다."
         );
+        OffsetDateTime afterFailure = OffsetDateTime.now(ZoneOffset.UTC);
 
         assertAll(
                 () -> assertTrue(result),
                 () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus()),
                 () -> assertNull(job.getLeaseExpiresAt()),
                 () -> assertEquals("INVALID_AUDIO", job.getErrorCode()),
-                () -> assertEquals("지원하지 않는 음성 파일입니다.", job.getErrorMessage())
+                () -> assertEquals("지원하지 않는 음성 파일입니다.", job.getErrorMessage()),
+                () -> assertFalse(job.getAudioCleanupDueAt()
+                        .isBefore(beforeFailure.plusHours(24))),
+                () -> assertFalse(job.getAudioCleanupDueAt()
+                        .isAfter(afterFailure.plusHours(24)))
         );
         verify(eventPublisher).publishEvent(new AnswerProcessingStatusChangedEvent(SESSION_ID));
     }
@@ -296,6 +303,7 @@ class SttJobControlServiceTest {
     @Test
     @DisplayName("STT 작업이 재시도 한도에 도달하면 실패 이벤트를 발행한다")
     void publishesFailureEventWhenRetryLimitIsReached() {
+        OffsetDateTime beforeFailure = OffsetDateTime.now(ZoneOffset.UTC);
         SttProcessingJob job = createThirdAttemptJob();
         when(sttProcessingJobRepository.findByIdForUpdate(PROCESSING_JOB_ID))
                 .thenReturn(Optional.of(job));
@@ -307,10 +315,15 @@ class SttJobControlServiceTest {
                 "STT_TIMEOUT",
                 "STT 요청 시간이 초과되었습니다."
         );
+        OffsetDateTime afterFailure = OffsetDateTime.now(ZoneOffset.UTC);
 
         assertAll(
                 () -> assertTrue(result),
-                () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus())
+                () -> assertEquals(ProcessingJobStatus.FAILED, job.getStatus()),
+                () -> assertFalse(job.getAudioCleanupDueAt()
+                        .isBefore(beforeFailure.plusHours(24))),
+                () -> assertFalse(job.getAudioCleanupDueAt()
+                        .isAfter(afterFailure.plusHours(24)))
         );
         verify(eventPublisher).publishEvent(new AnswerProcessingStatusChangedEvent(SESSION_ID));
     }
