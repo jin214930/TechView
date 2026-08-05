@@ -97,17 +97,7 @@ public class S3CompatibleAudioStorage implements AudioStorage {
                 .ifMatch(expectedEtag)
                 .build();
 
-        try {
-            s3Client.deleteObject(request);
-        } catch (S3Exception e) {
-            if (e.statusCode() == 404) {
-                return;
-            }
-
-            throw mapStorageException(objectKey, e);
-        } catch (SdkClientException e) {
-            throw new AudioStorageException(AudioStorageFailure.TEMPORARY_FAILURE, "음성 객체를 삭제할 수 없습니다.", e);
-        }
+        deleteObject(objectKey, request);
     }
 
     private AudioStorageException mapStorageException(String objectKey, S3Exception exception) {
@@ -120,5 +110,19 @@ public class S3CompatibleAudioStorage implements AudioStorage {
         };
 
         return new AudioStorageException(failure, "음성 객체를 처리할 수 없습니다: " + objectKey, exception);
+    }
+
+    private void deleteObject(String objectKey, DeleteObjectRequest request) {
+        try {
+            s3Client.deleteObject(request);
+        } catch (S3Exception exception) {
+            if (exception.statusCode() == NOT_FOUND_STATUS_CODE) {
+                return;
+            }
+
+            throw mapStorageException(objectKey, exception);
+        } catch (SdkClientException exception) {
+            throw new AudioStorageException(AudioStorageFailure.TEMPORARY_FAILURE, "음성 객체를 삭제할 수 없습니다.", exception);
+        }
     }
 }

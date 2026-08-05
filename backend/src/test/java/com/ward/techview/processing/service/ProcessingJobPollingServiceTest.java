@@ -30,6 +30,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -121,6 +122,7 @@ class ProcessingJobPollingServiceTest {
     @Test
     @DisplayName("최대 시도 횟수에서 lease가 만료된 작업을 최종 실패 처리한다")
     void failsExhaustedExpiredJob() {
+        OffsetDateTime beforeFailure = OffsetDateTime.now(ZoneOffset.UTC);
         ProcessingJob exhaustedJob = exhaustedJob(400L);
         when(processingJobRepository.findExhaustedExpiredJobs(
                 eq(ProcessingJobStatus.PROCESSING),
@@ -135,6 +137,11 @@ class ProcessingJobPollingServiceTest {
         )).thenReturn(List.of());
 
         int dispatchedCount = pollingService.pollAndPublish();
+        OffsetDateTime afterFailure = OffsetDateTime.now(ZoneOffset.UTC);
+        SttProcessingJob exhaustedSttJob = assertInstanceOf(
+                SttProcessingJob.class,
+                exhaustedJob
+        );
 
         assertAll(
                 () -> assertEquals(0, dispatchedCount),
@@ -145,7 +152,11 @@ class ProcessingJobPollingServiceTest {
                 () -> assertEquals(
                         "WORKER_LEASE_EXPIRED",
                         exhaustedJob.getErrorCode()
-                )
+                ),
+                () -> assertFalse(exhaustedSttJob.getAudioCleanupDueAt()
+                        .isBefore(beforeFailure.plusHours(24))),
+                () -> assertFalse(exhaustedSttJob.getAudioCleanupDueAt()
+                        .isAfter(afterFailure.plusHours(24)))
         );
         ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());

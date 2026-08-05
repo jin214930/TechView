@@ -4,6 +4,7 @@ import com.ward.techview.processing.api.*;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.ProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
+import com.ward.techview.processing.entity.SttProcessingJob;
 import com.ward.techview.processing.repository.ProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -54,6 +55,10 @@ public class ProcessingJobPollingService {
                     "WORKER_LEASE_EXPIRED",
                     "최대 시도 횟수에서 작업 처리 lease가 만료되었습니다."
             );
+
+            if (job instanceof SttProcessingJob sttJob) {
+                sttJob.scheduleAudioCleanup(now);
+            }
 
             publishTerminalStatusChangedEvent(job);
         });

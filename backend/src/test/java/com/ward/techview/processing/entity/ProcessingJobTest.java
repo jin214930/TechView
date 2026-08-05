@@ -187,6 +187,65 @@ class ProcessingJobTest {
     }
 
     @Test
+    @DisplayName("실패한 STT 작업은 실패 시각 24시간 후로 음성 정리를 예약한다")
+    void schedulesAudioCleanupAfterFailure() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+        job.fail("INVALID_AUDIO", "지원하지 않는 음성 파일입니다.");
+
+        job.scheduleAudioCleanup(QUEUED_AT);
+
+        assertEquals(
+                QUEUED_AT.plusHours(24),
+                job.getAudioCleanupDueAt()
+        );
+    }
+
+    @Test
+    @DisplayName("실패하지 않은 STT 작업은 음성 정리를 예약할 수 없다")
+    void rejectsAudioCleanupScheduleForNonFailedJob() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> job.scheduleAudioCleanup(QUEUED_AT)
+        );
+        assertNull(job.getAudioCleanupDueAt());
+    }
+
+    @Test
+    @DisplayName("정리 예정 시각이 지난 실패 음성을 삭제 완료 처리한다")
+    void marksFailedAudioAsDeleted() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+        job.fail("INVALID_AUDIO", "지원하지 않는 음성 파일입니다.");
+        job.scheduleAudioCleanup(QUEUED_AT);
+        OffsetDateTime deletedAt = QUEUED_AT.plusHours(25);
+
+        job.markAudioDeleted(deletedAt);
+        job.markAudioDeleted(deletedAt.plusMinutes(1));
+
+        assertEquals(deletedAt, job.getAudioDeletedAt());
+    }
+
+    @Test
+    @DisplayName("정리 예정 시각 전에는 실패 음성을 삭제 완료 처리할 수 없다")
+    void rejectsAudioDeletionBeforeCleanupDueTime() {
+        SttProcessingJob job = createJob(QUEUED_AT);
+        job.claim(QUEUED_AT, LEASE_DURATION);
+        job.fail("INVALID_AUDIO", "지원하지 않는 음성 파일입니다.");
+        job.scheduleAudioCleanup(QUEUED_AT);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> job.markAudioDeleted(
+                        QUEUED_AT.plusHours(24).minusNanos(1)
+                )
+        );
+        assertNull(job.getAudioDeletedAt());
+    }
+
+    @Test
     @DisplayName("잘못된 재시도 정보는 예외를 발생시키고 처리 상태를 유지한다")
     void rejectsInvalidRetryWithoutChangingState() {
         SttProcessingJob job = createJob(QUEUED_AT);
