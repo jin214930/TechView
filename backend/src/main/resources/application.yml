@@ -40,6 +40,12 @@ custom:
       cron: "0 0 4 * * *"
       time-zone: Asia/Seoul
       batch-size: 100
+  interview:
+    expired-session-cleanup:
+      retention-period: 30d
+      cron: "0 30 4 * * *"
+      time-zone: Asia/Seoul
+      batch-size: 100
   processing:
     worker:
       lease-duration: ${PROCESSING_JOB_LEASE_DURATION:2m}

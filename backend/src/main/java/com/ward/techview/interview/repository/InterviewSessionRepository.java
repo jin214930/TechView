@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface InterviewSessionRepository extends JpaRepository<InterviewSession, Long> {
@@ -43,4 +44,23 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
     Optional<InterviewSession> findByIdAndMemberId(Long sessionId, Long memberId);
 
     Page<InterviewSession> findAllByMemberIdAndStatus(Long memberId, InterviewStatus status, Pageable pageable);
+
+    @Query(
+            value = """
+                    SELECT session.*
+                    FROM interview_session session
+                    WHERE session.status = 'IN_PROGRESS'
+                      AND session.started_at < :cutoff
+                      AND session.id > :afterSessionId
+                    ORDER BY session.id
+                    LIMIT :limit
+                    FOR UPDATE SKIP LOCKED
+                    """,
+            nativeQuery = true
+    )
+    List<InterviewSession> findExpiredSessionsForUpdateSkipLocked(
+            @Param("cutoff") OffsetDateTime cutoff,
+            @Param("afterSessionId") Long afterSessionId,
+            @Param("limit") int limit
+    );
 }

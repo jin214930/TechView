@@ -75,4 +75,10 @@ public class InterviewSession extends BaseEntity {
             throw new IllegalStateException("진행 중인 면접 세션만 변경할 수 있습니다.");
         }
     }
+
+    public boolean isExpired(OffsetDateTime cutoff) {
+        Objects.requireNonNull(cutoff, "면접 만료 기준 시각은 필수입니다.");
+
+        return status == InterviewStatus.IN_PROGRESS && startedAt.isBefore(cutoff);
+    }
 }
