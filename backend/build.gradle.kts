@@ -53,6 +53,7 @@ dependencies {
     add(integrationTest.implementationConfigurationName, "org.springframework.boot:spring-boot-testcontainers")
     add(integrationTest.implementationConfigurationName, "org.testcontainers:testcontainers-junit-jupiter")
     add(integrationTest.implementationConfigurationName, "org.testcontainers:testcontainers-postgresql")
+    add(integrationTest.implementationConfigurationName, "org.awaitility:awaitility:4.3.0")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
     testCompileOnly("org.projectlombok:lombok")
