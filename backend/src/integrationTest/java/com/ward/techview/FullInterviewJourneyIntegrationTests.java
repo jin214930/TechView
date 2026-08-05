@@ -66,7 +66,6 @@ class FullInterviewJourneyIntegrationTests {
     @ServiceConnection
     static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17");
 
-    @Container
     static final GenericContainer<?> minio = new GenericContainer<>(
             DockerImageName.parse("quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z")
     )
@@ -75,6 +74,10 @@ class FullInterviewJourneyIntegrationTests {
             .withCommand("server", "/data")
             .withExposedPorts(9000)
             .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000));
+
+    static {
+        minio.start();
+    }
 
     @DynamicPropertySource
     static void configureStorage(DynamicPropertyRegistry registry) {

@@ -24,6 +24,7 @@ public class AuthController {
     private final RefreshTokenCookieManager refreshTokenCookieManager;
 
     @PostMapping("/signup")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "회원가입 성공")
     public ApiResponse<Void> signUp(@Valid @RequestBody SignUpRequest request) {
         authService.signUp(request);
         return ApiResponse.from(AuthResponseCode.SIGNUP_SUCCESS);

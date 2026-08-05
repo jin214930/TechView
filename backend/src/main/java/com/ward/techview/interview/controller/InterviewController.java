@@ -33,6 +33,10 @@ public class InterviewController {
     }
 
     @PostMapping
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "진행 중인 면접 재개"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "새 면접 시작")
+    })
     public ApiResponse<InterviewStartResponse> startOrResume(@AuthenticationPrincipal CustomUserDetails principal) {
         InterviewStartResponse response = interviewService.startOrResume(principal.id());
         CommonResponseCode responseCode = response.resumed() ? CommonResponseCode.SUCCESS : CommonResponseCode.CREATED;

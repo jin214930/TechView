@@ -13,6 +13,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -44,6 +45,12 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.responses", hasKey("400")))
                 .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.responses", hasKey("401")))
                 .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.responses", hasKey("409")))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/signup'].post.responses", hasKey("201")))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/signup'].post.responses", not(hasKey("200"))))
+                .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.responses", hasKey("201")))
+                .andExpect(jsonPath("$.paths['/api/v1/interviews/{sessionId}/turns/{turnId}/answers'].post.responses", hasKey("201")))
+                .andExpect(jsonPath("$.paths['/api/v1/answers/{answerId}/upload-completion'].post.responses", hasKey("202")))
+                .andExpect(jsonPath("$.paths['/api/v1/answers/{answerId}/upload-completion'].post.responses", not(hasKey("200"))))
                 .andExpect(jsonPath("$.components.schemas.ApiErrorResponse").exists())
                 .andExpect(jsonPath("$.components.schemas.ApiResponseEnvelope").exists())
                 .andExpect(jsonPath("$.components.schemas.PageResponseEnvelope").exists());

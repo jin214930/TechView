@@ -32,7 +32,15 @@ public class OpenApiConfig {
                                 .bearerFormat("JWT"))
                         .addSchemas("ApiResponseEnvelope", apiResponseSchema())
                         .addSchemas("PageResponseEnvelope", pageResponseSchema())
-                        .addSchemas("ApiErrorResponse", errorSchema()));
+                        .addSchemas("ApiErrorResponse", errorSchema())
+                        .addResponses("CommonSuccessResponse", reusableResponse(
+                                "공통 성공 응답",
+                                "#/components/schemas/ApiResponseEnvelope"
+                        ))
+                        .addResponses("CommonPageResponse", reusableResponse(
+                                "공통 페이지 응답",
+                                "#/components/schemas/PageResponseEnvelope"
+                        )));
     }
 
     @Bean
@@ -85,5 +93,14 @@ public class OpenApiConfig {
                 .addProperty("totalElements", new Schema<Long>().type("integer").format("int64"))
                 .addProperty("totalPages", new Schema<Integer>().type("integer"))
                 .addProperty("hasNext", new Schema<Boolean>().type("boolean"));
+    }
+
+    private io.swagger.v3.oas.models.responses.ApiResponse reusableResponse(String description, String schemaReference) {
+        return new io.swagger.v3.oas.models.responses.ApiResponse()
+                .description(description)
+                .content(new Content().addMediaType(
+                        org.springframework.http.MediaType.APPLICATION_JSON_VALUE,
+                        new MediaType().schema(new Schema<>().$ref(schemaReference))
+                ));
     }
 }
