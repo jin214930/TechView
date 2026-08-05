@@ -7,6 +7,7 @@ import com.ward.techview.common.response.ApiResponse;
 import com.ward.techview.common.response.CommonResponseCode;
 import com.ward.techview.common.security.CustomUserDetails;
 import jakarta.servlet.http.HttpServletResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/members")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 public class MemberController {
     private final MemberService memberService;
     private final RefreshTokenCookieManager refreshTokenCookieManager;
