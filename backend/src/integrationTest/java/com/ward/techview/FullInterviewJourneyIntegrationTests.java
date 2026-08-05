@@ -67,7 +67,7 @@ class FullInterviewJourneyIntegrationTests {
     static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17");
 
     static final GenericContainer<?> minio = new GenericContainer<>(
-            DockerImageName.parse("quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z")
+            DockerImageName.parse("minio/minio:RELEASE.2025-04-22T22-12-26Z")
     )
             .withEnv("MINIO_ROOT_USER", ACCESS_KEY)
             .withEnv("MINIO_ROOT_PASSWORD", SECRET_KEY)
