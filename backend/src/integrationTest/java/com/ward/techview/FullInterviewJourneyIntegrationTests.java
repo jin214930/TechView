@@ -91,8 +91,7 @@ class FullInterviewJourneyIntegrationTests {
     @Autowired
     MockMvc mockMvc;
 
-    @Autowired
-    ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     S3Client s3Client;
