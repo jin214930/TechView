@@ -276,6 +276,27 @@ class InterviewAnswerServiceTest {
     }
 
     @Test
+    @DisplayName("완료된 면접에서도 회원 소유의 답변 정보를 조회한다")
+    void shouldGetOwnedAnswerInfoFromCompletedInterview() {
+        InterviewSession session = session(InterviewStatus.COMPLETED, 1);
+        InterviewTurn turn = turn(session, 1);
+        Answer answer = Answer.create(turn, OBJECT_KEY, CONTENT_TYPE, DURATION_MS);
+        ReflectionTestUtils.setField(answer, "id", ANSWER_ID);
+        when(answerRepository.findByIdAndMemberId(ANSWER_ID, MEMBER_ID))
+                .thenReturn(Optional.of(answer));
+
+        AnswerInfo result = interviewAnswerService.getAnswer(MEMBER_ID, ANSWER_ID);
+
+        assertAll(
+                () -> assertEquals(ANSWER_ID, result.answerId()),
+                () -> assertEquals(SESSION_ID, result.interviewSessionId()),
+                () -> assertEquals(OBJECT_KEY, result.audioObjectKey()),
+                () -> assertEquals(CONTENT_TYPE, result.audioContentType())
+        );
+        verify(retentionPolicy, never()).isExpired(any(), any());
+    }
+
+    @Test
     @DisplayName("회원 소유의 답변이 없으면 조회를 거부한다")
     void shouldRejectWhenOwnedAnswerDoesNotExist() {
         when(answerRepository.findByIdAndMemberId(ANSWER_ID, MEMBER_ID))

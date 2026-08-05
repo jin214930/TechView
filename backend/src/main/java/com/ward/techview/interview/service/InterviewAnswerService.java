@@ -47,11 +47,6 @@ public class InterviewAnswerService implements InterviewAnswerApi {
         Answer answer = answerRepository.findByIdAndMemberId(answerId, memberId)
                 .orElseThrow(() -> new BusinessException(InterviewResponseCode.ANSWER_NOT_FOUND));
 
-        validateAvailable(
-                answer.getInterviewTurn().getSession(),
-                OffsetDateTime.now(ZoneOffset.UTC)
-        );
-
         return toAnswerInfo(answer);
     }
 
