@@ -19,14 +19,19 @@ public class SttAudioCleanupService implements SttAudioCleanupApi {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FailedAudioCleanupTarget> findDueTargets(OffsetDateTime now, int limit) {
+    public List<FailedAudioCleanupTarget> findDueTargets(OffsetDateTime now, Long afterProcessingJobId, int limit) {
         Objects.requireNonNull(now, "현재 시각은 필수입니다.");
+        Objects.requireNonNull(afterProcessingJobId, "마지막 Processing Job ID는 필수입니다.");
+
+        if (afterProcessingJobId < 0) {
+            throw new IllegalArgumentException("마지막 Processing Job ID는 0 이상이어야 합니다.");
+        }
 
         if (limit <= 0) {
             throw new IllegalArgumentException("조회 개수는 0보다 커야 합니다.");
         }
 
-        return repository.findDueAudioCleanupJobs(now, PageRequest.of(0, limit))
+        return repository.findDueAudioCleanupJobs(now, afterProcessingJobId, PageRequest.of(0, limit))
                 .stream()
                 .map(job -> new FailedAudioCleanupTarget(
                         job.getId(),

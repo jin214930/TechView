@@ -31,7 +31,12 @@ public interface SttProcessingJobRepository extends JpaRepository<SttProcessingJ
             WHERE job.status = com.ward.techview.processing.entity.ProcessingJobStatus.FAILED
               AND job.audioCleanupDueAt <= :now
               AND job.audioDeletedAt IS NULL
-            ORDER BY job.audioCleanupDueAt, job.id
+              AND job.id > :afterProcessingJobId
+            ORDER BY job.id
             """)
-    List<SttProcessingJob> findDueAudioCleanupJobs(@Param("now") OffsetDateTime now, Pageable pageable);
+    List<SttProcessingJob> findDueAudioCleanupJobs(
+            @Param("now") OffsetDateTime now,
+            @Param("afterProcessingJobId") Long afterProcessingJobId,
+            Pageable pageable
+    );
 }

@@ -10,4 +10,6 @@ public interface AudioStorage {
     AudioObject download(String objectKey, String expectedEtag);
 
     void delete(String objectKey, String expectedEtag);
+
+    void deleteUnconditionally(String objectKey);
 }
