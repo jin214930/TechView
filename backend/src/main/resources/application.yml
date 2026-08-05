@@ -40,6 +40,12 @@ custom:
       cron: "0 0 4 * * *"
       time-zone: Asia/Seoul
       batch-size: 100
+    orphan-audio-cleanup:
+      prefix: interviews/
+      grace-period: 24h
+      cron: "0 0 5 * * *"
+      time-zone: Asia/Seoul
+      page-size: 1000
   interview:
     expired-session-cleanup:
       retention-period: 30d
