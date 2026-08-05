@@ -15,6 +15,7 @@ import com.ward.techview.interview.repository.InterviewCoreQuestionRepository;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,8 +61,19 @@ class InterviewProgressServiceTest {
     @Mock
     private InterviewTurnRepository interviewTurnRepository;
 
+    @Mock
+    private InterviewRetentionPolicy retentionPolicy;
+
     @InjectMocks
     private InterviewProgressService progressService;
+
+    @BeforeEach
+    void setUpRetentionPolicy() {
+        lenient().when(retentionPolicy.isExpired(
+                any(InterviewSession.class),
+                any(OffsetDateTime.class)
+        )).thenReturn(false);
+    }
 
     @Test
     @DisplayName("핵심 질문 분석에서 꼬리 질문이 필요하면 다음 턴으로 생성한다")
@@ -184,6 +197,30 @@ class InterviewProgressServiceTest {
         );
 
         verify(coreQuestionRepository, never()).findBySessionIdAndQuestionOrder(any(), any(Integer.class));
+        verify(interviewTurnRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("만료된 면접은 답변 분석이 끝나도 다음 턴으로 진행하지 않는다")
+    void rejectsProgressForExpiredInterview() {
+        InterviewSession session = session();
+        when(interviewSessionRepository.findByIdForUpdate(SESSION_ID))
+                .thenReturn(Optional.of(session));
+        when(retentionPolicy.isExpired(session, ANALYZED_AT)).thenReturn(true);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> progressService.advanceAfterAnalysis(
+                        new InterviewAdvanceCommand(
+                                SESSION_ID,
+                                ANSWER_ID,
+                                null,
+                                ANALYZED_AT
+                        )
+                )
+        );
+
+        verify(answerRepository, never()).findByIdAndSessionIdForUpdate(any(), any());
         verify(interviewTurnRepository, never()).save(any());
     }
 
