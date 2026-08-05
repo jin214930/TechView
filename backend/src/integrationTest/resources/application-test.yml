@@ -56,3 +56,9 @@ custom:
       prompt-version: interview-feedback-test-v1
       max-output-tokens: 2000
       timeout: 1s
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

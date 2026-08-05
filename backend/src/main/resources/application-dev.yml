@@ -38,3 +38,9 @@ custom:
     token:
       secure: false
       same-site: lax
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

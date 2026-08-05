@@ -9,6 +9,8 @@ import com.ward.techview.common.response.ApiResponse;
 import com.ward.techview.common.response.CommonResponseCode;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +32,7 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(
             @Valid @RequestBody LoginRequest request,
+            @Parameter(name = "refreshToken", in = ParameterIn.COOKIE, description = "기존 세션의 Refresh Token")
             @CookieValue(name = "refreshToken", required = false) String existingRefreshToken,
             HttpServletResponse response
     ) {
@@ -40,6 +43,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ApiResponse<Void> logout(
+            @Parameter(name = "refreshToken", in = ParameterIn.COOKIE, description = "폐기할 Refresh Token")
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
             HttpServletResponse response
     ) {
@@ -50,6 +54,7 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ApiResponse<TokenResponse> refresh(
+            @Parameter(name = "refreshToken", in = ParameterIn.COOKIE, description = "토큰 재발급용 Refresh Token", required = true)
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
             HttpServletResponse response
     ) {
