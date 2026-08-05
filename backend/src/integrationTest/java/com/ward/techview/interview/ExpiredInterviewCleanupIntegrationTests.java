@@ -144,6 +144,22 @@ class ExpiredInterviewCleanupIntegrationTests {
         assertEquals(1, indexCount);
     }
 
+    @Test
+    @DisplayName("Flyway가 음성 객체 참조 조회 인덱스를 생성한다")
+    void createsAnswerAudioObjectKeyIndex() {
+        Integer indexCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM pg_indexes
+                        WHERE schemaname = 'public'
+                          AND indexname = 'idx_answer_audio_object_key'
+                        """,
+                Integer.class
+        );
+
+        assertEquals(1, indexCount);
+    }
+
     private InterviewSession createExpiredSession() {
         return interviewSessionRepository.saveAndFlush(
                 InterviewSession.create(
