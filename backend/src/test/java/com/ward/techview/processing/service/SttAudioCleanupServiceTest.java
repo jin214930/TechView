@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -32,17 +34,9 @@ import static org.mockito.Mockito.when;
 class SttAudioCleanupServiceTest {
 
     private static final Long PROCESSING_JOB_ID = 100L;
-    private static final String AUDIO_OBJECT_KEY =
-            "interviews/10/answers/20/audio.webm";
+    private static final String AUDIO_OBJECT_KEY = "interviews/10/answers/20/audio.webm";
     private static final OffsetDateTime FAILED_AT = OffsetDateTime.of(
-            2026,
-            8,
-            5,
-            3,
-            0,
-            0,
-            0,
-            ZoneOffset.UTC
+            2026, 8, 5, 3, 0, 0, 0, ZoneOffset.UTC
     );
 
     @Mock
@@ -56,44 +50,43 @@ class SttAudioCleanupServiceTest {
     }
 
     @Test
-    @DisplayName("정리 예정 시각이 지난 실패 음성을 제한된 개수만 조회한다")
+    @DisplayName("정리 예정 시각이 지난 실패 음성을 커서 다음부터 제한된 개수만 조회한다")
     void findsDueAudioCleanupTargets() {
         SttProcessingJob job = failedJob();
         OffsetDateTime now = FAILED_AT.plusHours(25);
-        when(repository.findDueAudioCleanupJobs(
-                org.mockito.ArgumentMatchers.eq(now),
-                org.mockito.ArgumentMatchers.any(Pageable.class)
-        )).thenReturn(List.of(job));
+        long cursor = 50L;
+        when(repository.findDueAudioCleanupJobs(eq(now), eq(cursor), any(Pageable.class)))
+                .thenReturn(List.of(job));
 
-        List<FailedAudioCleanupTarget> result =
-                service.findDueTargets(now, 100);
+        List<FailedAudioCleanupTarget> result = service.findDueTargets(now, cursor, 100);
 
-        ArgumentCaptor<Pageable> pageableCaptor =
-                ArgumentCaptor.forClass(Pageable.class);
-        verify(repository).findDueAudioCleanupJobs(
-                org.mockito.ArgumentMatchers.eq(now),
-                pageableCaptor.capture()
-        );
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findDueAudioCleanupJobs(eq(now), eq(cursor), pageableCaptor.capture());
         assertAll(
                 () -> assertEquals(1, result.size()),
-                () -> assertEquals(
-                        PROCESSING_JOB_ID,
-                        result.getFirst().processingJobId()
-                ),
-                () -> assertEquals(
-                        AUDIO_OBJECT_KEY,
-                        result.getFirst().audioObjectKey()
-                ),
+                () -> assertEquals(PROCESSING_JOB_ID, result.getFirst().processingJobId()),
+                () -> assertEquals(AUDIO_OBJECT_KEY, result.getFirst().audioObjectKey()),
                 () -> assertEquals(100, pageableCaptor.getValue().getPageSize())
         );
     }
 
     @Test
-    @DisplayName("정리 대상 조회 개수가 0 이하면 거부한다")
+    @DisplayName("정리 대상 조회 개수가 0 이하면 거절한다")
     void rejectsInvalidCleanupTargetLimit() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.findDueTargets(FAILED_AT, 0)
+                () -> service.findDueTargets(FAILED_AT, 0L, 0)
+        );
+
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    @DisplayName("정리 대상 조회 커서가 음수면 거절한다")
+    void rejectsNegativeCleanupTargetCursor() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.findDueTargets(FAILED_AT, -1L, 100)
         );
 
         verifyNoInteractions(repository);
@@ -104,13 +97,9 @@ class SttAudioCleanupServiceTest {
     void marksAudioAsDeleted() {
         SttProcessingJob job = failedJob();
         OffsetDateTime deletedAt = FAILED_AT.plusHours(25);
-        when(repository.findByIdForUpdate(PROCESSING_JOB_ID))
-                .thenReturn(Optional.of(job));
+        when(repository.findByIdForUpdate(PROCESSING_JOB_ID)).thenReturn(Optional.of(job));
 
-        boolean result = service.markAudioDeleted(
-                PROCESSING_JOB_ID,
-                deletedAt
-        );
+        boolean result = service.markAudioDeleted(PROCESSING_JOB_ID, deletedAt);
 
         assertAll(
                 () -> assertTrue(result),
@@ -121,8 +110,7 @@ class SttAudioCleanupServiceTest {
     @Test
     @DisplayName("존재하지 않는 STT 작업의 삭제 완료 요청은 실패 결과를 반환한다")
     void returnsFalseWhenCleanupJobDoesNotExist() {
-        when(repository.findByIdForUpdate(PROCESSING_JOB_ID))
-                .thenReturn(Optional.empty());
+        when(repository.findByIdForUpdate(PROCESSING_JOB_ID)).thenReturn(Optional.empty());
 
         boolean result = service.markAudioDeleted(
                 PROCESSING_JOB_ID,

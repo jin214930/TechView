@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -265,6 +266,42 @@ class S3CompatibleAudioStorageTest {
                         request.key()
                 ),
                 () -> assertEquals("verified-audio-etag", request.ifMatch())
+        );
+    }
+
+    @Test
+    @DisplayName("실패 음성 정리 시 ETag 조건 없이 객체를 삭제한다")
+    void shouldDeleteAudioObjectUnconditionally() {
+        audioStorage.deleteUnconditionally(
+                "interviews/10/turns/100/audio-key"
+        );
+
+        ArgumentCaptor<DeleteObjectRequest> requestCaptor =
+                ArgumentCaptor.forClass(DeleteObjectRequest.class);
+        verify(s3Client).deleteObject(requestCaptor.capture());
+        DeleteObjectRequest request = requestCaptor.getValue();
+        assertAll(
+                () -> assertEquals("techview-audio", request.bucket()),
+                () -> assertEquals(
+                        "interviews/10/turns/100/audio-key",
+                        request.key()
+                ),
+                () -> assertNull(request.ifMatch())
+        );
+    }
+
+    @Test
+    @DisplayName("이미 삭제된 실패 음성을 조건 없이 다시 삭제해도 성공으로 처리한다")
+    void shouldTreatMissingUnconditionalAudioObjectDeletionAsSuccess() {
+        S3Exception notFound = mock(S3Exception.class);
+        when(notFound.statusCode()).thenReturn(404);
+        when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
+                .thenThrow(notFound);
+
+        assertDoesNotThrow(
+                () -> audioStorage.deleteUnconditionally(
+                        "interviews/10/turns/100/missing-audio-key"
+                )
         );
     }
 
