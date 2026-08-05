@@ -61,10 +61,13 @@ public class SttJobControlService implements SttJobControl {
     @Override
     @Transactional
     public boolean retry(Long processingJobId, int attemptCount, OffsetDateTime nextAttemptAt, String errorCode, String errorMessage) {
+        OffsetDateTime failedAt = OffsetDateTime.now(ZoneOffset.UTC);
+
         return findCurrentAttempt(processingJobId, attemptCount)
                 .map(job -> {
                     job.retry(nextAttemptAt, errorCode, errorMessage);
                     if (job.getStatus() == ProcessingJobStatus.FAILED) {
+                        job.scheduleAudioCleanup(failedAt);
                         publishStatusChanged(job);
                     }
                     return true;
@@ -75,9 +78,12 @@ public class SttJobControlService implements SttJobControl {
     @Override
     @Transactional
     public boolean fail(Long processingJobId, int attemptCount, String errorCode, String errorMessage) {
+        OffsetDateTime failedAt = OffsetDateTime.now(ZoneOffset.UTC);
+
         return findCurrentAttempt(processingJobId, attemptCount)
                 .map(job -> {
                     job.fail(errorCode, errorMessage);
+                    job.scheduleAudioCleanup(failedAt);
                     publishStatusChanged(job);
                     return true;
                 })

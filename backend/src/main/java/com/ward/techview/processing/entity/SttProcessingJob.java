@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 
@@ -26,6 +27,7 @@ import java.util.Objects;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SttProcessingJob extends ProcessingJob {
+    private static final Duration FAILED_AUDIO_RETENTION_PERIOD = Duration.ofHours(24);
 
     @Column(nullable = false)
     private Long answerId;
@@ -37,12 +39,16 @@ public class SttProcessingJob extends ProcessingJob {
      * STT 워커는 음성 객체 조회 시 이 값을 If-Match 조건으로 사용한다.
      * 검증 이후 같은 객체 키가 덮어써져도 검증하지 않은 바이트를 처리하지 않는다.
      */
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false)
     private String sourceObjectEtag;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private SttProcessingStage processingStage;
+
+    private OffsetDateTime audioCleanupDueAt;
+
+    private OffsetDateTime audioDeletedAt;
 
     private SttProcessingJob(
             Long interviewSessionId,
@@ -54,10 +60,7 @@ public class SttProcessingJob extends ProcessingJob {
         super(interviewSessionId, queuedAt);
         this.answerId = Objects.requireNonNull(answerId, "답변 ID는 필수입니다.");
         this.audioObjectKey = requireText(audioObjectKey, "음성 객체 키는 필수입니다.");
-        this.sourceObjectEtag = requireText(
-                sourceObjectEtag,
-                "STT 작업에는 검증된 음성 객체 ETag가 필요합니다."
-        );
+        this.sourceObjectEtag = requireText(sourceObjectEtag, "STT 작업에는 검증된 음성 객체 ETag가 필요합니다.");
         this.processingStage = SttProcessingStage.TRANSCRIPTION;
     }
 
@@ -92,5 +95,41 @@ public class SttProcessingJob extends ProcessingJob {
         }
 
         processingStage = SttProcessingStage.CLEANUP;
+    }
+
+    public void scheduleAudioCleanup(OffsetDateTime failedAt) {
+        if (getStatus() != ProcessingJobStatus.FAILED) {
+            throw new IllegalStateException("실패한 STT 작업만 음성 정리를 예약할 수 있습니다.");
+        }
+
+        Objects.requireNonNull(failedAt, "STT 작업 실패 시각은 필수입니다.");
+
+        if (audioCleanupDueAt != null) {
+            return;
+        }
+
+        audioCleanupDueAt = failedAt.plus(FAILED_AUDIO_RETENTION_PERIOD);
+    }
+
+    public void markAudioDeleted(OffsetDateTime deletedAt) {
+        if (getStatus() != ProcessingJobStatus.FAILED) {
+            throw new IllegalStateException("실패한 STT 작업만 음성 삭제 완료 처리할 수 있습니다.");
+        }
+
+        Objects.requireNonNull(deletedAt, "음성 삭제 시각은 필수입니다.");
+
+        if (audioCleanupDueAt == null) {
+            throw new IllegalStateException("음성 정리가 예약되지 않았습니다.");
+        }
+
+        if (deletedAt.isBefore(audioCleanupDueAt)) {
+            throw new IllegalArgumentException("음성 정리 예정 시각 전에는 삭제 완료 처리할 수 없습니다.");
+        }
+
+        if (audioDeletedAt != null) {
+            return;
+        }
+
+        audioDeletedAt = deletedAt;
     }
 }

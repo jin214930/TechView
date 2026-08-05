@@ -36,6 +36,10 @@ custom:
   voice:
     upload:
       max-file-size: ${AUDIO_MAX_FILE_SIZE:25MB}
+    failed-audio-cleanup:
+      cron: "0 0 4 * * *"
+      time-zone: Asia/Seoul
+      batch-size: 100
   processing:
     worker:
       lease-duration: ${PROCESSING_JOB_LEASE_DURATION:2m}
