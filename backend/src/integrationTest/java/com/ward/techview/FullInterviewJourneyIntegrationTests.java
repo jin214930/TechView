@@ -255,13 +255,13 @@ class FullInterviewJourneyIntegrationTests {
     static class ProviderStubConfiguration {
         @Bean
         @Primary
-        SpeechToTextProvider speechToTextProvider() {
+        SpeechToTextProvider deterministicSpeechToTextProvider() {
             return audio -> new TranscriptionResult("테스트 답변입니다.");
         }
 
         @Bean
         @Primary
-        AnswerAnalysisProvider answerAnalysisProvider() {
+        AnswerAnalysisProvider deterministicAnswerAnalysisProvider() {
             AtomicInteger calls = new AtomicInteger();
             return prompt -> {
                 boolean ask = calls.getAndIncrement() == 0 && prompt.followUpAllowed();
@@ -280,7 +280,7 @@ class FullInterviewJourneyIntegrationTests {
 
         @Bean
         @Primary
-        InterviewFeedbackProvider interviewFeedbackProvider() {
+        InterviewFeedbackProvider deterministicInterviewFeedbackProvider() {
             return prompt -> new InterviewFeedbackResult(
                     "전체적으로 핵심 개념을 잘 설명했습니다.",
                     List.of("답변 구조가 명확합니다."),

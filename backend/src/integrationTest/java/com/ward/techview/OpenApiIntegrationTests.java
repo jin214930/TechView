@@ -45,8 +45,8 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.responses", hasKey("401")))
                 .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.responses", hasKey("409")))
                 .andExpect(jsonPath("$.components.schemas.ApiErrorResponse").exists())
-                .andExpect(jsonPath("$.components.schemas.ApiResponse").exists())
-                .andExpect(jsonPath("$.components.schemas.PageResponse").exists());
+                .andExpect(jsonPath("$.components.schemas.ApiResponseEnvelope").exists())
+                .andExpect(jsonPath("$.components.schemas.PageResponseEnvelope").exists());
     }
 
     @Test

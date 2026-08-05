@@ -30,8 +30,8 @@ public class OpenApiConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT"))
-                        .addSchemas("ApiResponse", apiResponseSchema())
-                        .addSchemas("PageResponse", pageResponseSchema())
+                        .addSchemas("ApiResponseEnvelope", apiResponseSchema())
+                        .addSchemas("PageResponseEnvelope", pageResponseSchema())
                         .addSchemas("ApiErrorResponse", errorSchema()));
     }
 
