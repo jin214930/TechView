@@ -66,9 +66,9 @@ class FailedAudioCleanupServiceTest {
         int deletedCount = service.cleanup();
 
         assertEquals(3, deletedCount);
-        verify(audioStorage).deleteUnconditionally(first.audioObjectKey());
-        verify(audioStorage).deleteUnconditionally(second.audioObjectKey());
-        verify(audioStorage).deleteUnconditionally(third.audioObjectKey());
+        verify(audioStorage).delete(first.audioObjectKey(), first.sourceObjectEtag());
+        verify(audioStorage).delete(second.audioObjectKey(), second.sourceObjectEtag());
+        verify(audioStorage).delete(third.audioObjectKey(), third.sourceObjectEtag());
     }
 
     @Test
@@ -92,8 +92,8 @@ class FailedAudioCleanupServiceTest {
     }
 
     @Test
-    @DisplayName("한 객체 삭제가 실패해도 나머지 대상은 계속 정리한다")
-    void continuesWhenOneStorageDeletionFails() {
+    @DisplayName("한 객체의 ETag가 일치하지 않아도 완료 표시 없이 나머지 대상을 계속 정리한다")
+    void continuesWithoutMarkingWhenOneObjectEtagDoesNotMatch() {
         FailedAudioCleanupTarget first = target(1L);
         FailedAudioCleanupTarget second = target(2L);
         when(sttAudioCleanupApi.findDueTargets(any(), eq(0L), eq(2)))
@@ -101,10 +101,10 @@ class FailedAudioCleanupServiceTest {
         when(sttAudioCleanupApi.findDueTargets(any(), eq(2L), eq(2)))
                 .thenReturn(List.of());
         doThrow(new AudioStorageException(
-                AudioStorageFailure.TEMPORARY_FAILURE,
-                "일시적 오류",
+                AudioStorageFailure.VERSION_MISMATCH,
+                "ETag 불일치",
                 new RuntimeException()
-        )).when(audioStorage).deleteUnconditionally(first.audioObjectKey());
+        )).when(audioStorage).delete(first.audioObjectKey(), first.sourceObjectEtag());
         when(sttAudioCleanupApi.markAudioDeleted(eq(2L), any(OffsetDateTime.class)))
                 .thenReturn(true);
 
@@ -113,7 +113,7 @@ class FailedAudioCleanupServiceTest {
         assertEquals(1, deletedCount);
         verify(sttAudioCleanupApi, never())
                 .markAudioDeleted(eq(1L), any(OffsetDateTime.class));
-        verify(audioStorage).deleteUnconditionally(second.audioObjectKey());
+        verify(audioStorage).delete(second.audioObjectKey(), second.sourceObjectEtag());
     }
 
     @Test
@@ -133,7 +133,8 @@ class FailedAudioCleanupServiceTest {
     private static FailedAudioCleanupTarget target(Long processingJobId) {
         return new FailedAudioCleanupTarget(
                 processingJobId,
-                "interviews/10/answers/" + processingJobId + "/audio.webm"
+                "interviews/10/answers/" + processingJobId + "/audio.webm",
+                "etag-" + processingJobId
         );
     }
 }

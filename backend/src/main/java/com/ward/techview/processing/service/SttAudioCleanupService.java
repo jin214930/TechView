@@ -35,7 +35,8 @@ public class SttAudioCleanupService implements SttAudioCleanupApi {
                 .stream()
                 .map(job -> new FailedAudioCleanupTarget(
                         job.getId(),
-                        job.getAudioObjectKey()
+                        job.getAudioObjectKey(),
+                        job.getSourceObjectEtag()
                 ))
                 .toList();
     }

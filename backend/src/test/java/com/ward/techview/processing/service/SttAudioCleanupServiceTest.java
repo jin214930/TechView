@@ -66,6 +66,7 @@ class SttAudioCleanupServiceTest {
                 () -> assertEquals(1, result.size()),
                 () -> assertEquals(PROCESSING_JOB_ID, result.getFirst().processingJobId()),
                 () -> assertEquals(AUDIO_OBJECT_KEY, result.getFirst().audioObjectKey()),
+                () -> assertEquals("verified-etag", result.getFirst().sourceObjectEtag()),
                 () -> assertEquals(100, pageableCaptor.getValue().getPageSize())
         );
     }

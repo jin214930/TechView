@@ -100,16 +100,6 @@ public class S3CompatibleAudioStorage implements AudioStorage {
         deleteObject(objectKey, request);
     }
 
-    @Override
-    public void deleteUnconditionally(String objectKey) {
-        DeleteObjectRequest request = DeleteObjectRequest.builder()
-                .bucket(properties.bucket())
-                .key(objectKey)
-                .build();
-
-        deleteObject(objectKey, request);
-    }
-
     private AudioStorageException mapStorageException(String objectKey, S3Exception exception) {
         AudioStorageFailure failure = switch (exception.statusCode()) {
             case 404 -> AudioStorageFailure.OBJECT_NOT_FOUND;
