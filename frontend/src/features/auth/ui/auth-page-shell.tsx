@@ -51,7 +51,7 @@ export function AuthPageShell({
 
         <section className="rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_24px_80px_-30px_rgba(30,64,175,0.35)] backdrop-blur sm:p-9">
           <p className="text-sm font-bold text-blue-600 lg:hidden">{eyebrow}</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 lg:mt-0">
+          <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 whitespace-nowrap sm:text-3xl lg:mt-0">
             {title}
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>

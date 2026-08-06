@@ -24,8 +24,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <AuthPageShell
-      eyebrow="Welcome back"
-      title="다시 만나서 반가워요"
+      eyebrow="Welcome"
+      title="TechView에 오신 것을 환영해요"
       description="로그인하고 진행 중인 면접을 이어가거나 새로운 면접을 시작해 보세요."
     >
       <LoginForm
