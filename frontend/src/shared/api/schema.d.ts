@@ -757,10 +757,7 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie: {
-                /** @description 토큰 재발급용 Refresh Token */
-                refreshToken: string;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -825,10 +822,7 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: {
-                /** @description 폐기할 Refresh Token */
-                refreshToken?: string;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -893,10 +887,7 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: {
-                /** @description 기존 세션의 Refresh Token */
-                refreshToken?: string;
-            };
+            cookie?: never;
         };
         requestBody: {
             content: {

@@ -39,14 +39,7 @@ export function createAuthApi(client: TechViewApiClient): AuthApi {
     },
 
     async refresh() {
-      const result = await client.POST("/api/v1/auth/refresh", {
-        params: {
-          cookie: {
-            // The browser sends the real HttpOnly cookie through credentials: include.
-            refreshToken: "browser-managed",
-          },
-        },
-      });
+      const result = await client.POST("/api/v1/auth/refresh");
       const data = unwrapApiResponse(result);
       return requireString(data?.accessToken, "accessToken");
     },
