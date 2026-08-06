@@ -1,13 +1,16 @@
 package com.ward.techview.common.openapi;
 
-import com.ward.techview.common.response.ApiResponse;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.ArraySchema;
+import io.swagger.v3.oas.models.media.BooleanSchema;
+import io.swagger.v3.oas.models.media.IntegerSchema;
+import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.customizers.OperationCustomizer;
@@ -68,31 +71,28 @@ public class OpenApiConfig {
     }
 
     private Schema<?> errorSchema() {
-        return new Schema<ApiResponse<Void>>()
-                .type("object")
-                .addProperty("code", new Schema<Integer>().type("integer").example(1000))
-                .addProperty("message", new Schema<String>().type("string").example("요청을 처리할 수 없습니다."));
+        return new ObjectSchema()
+                .addProperty("code", new IntegerSchema().example(1000))
+                .addProperty("message", new StringSchema().example("요청을 처리할 수 없습니다."));
     }
 
     private Schema<?> apiResponseSchema() {
-        return new Schema<>()
-                .type("object")
+        return new ObjectSchema()
                 .description("모든 JSON API가 사용하는 공통 응답 봉투")
-                .addProperty("code", new Schema<Integer>().type("integer").example(0))
-                .addProperty("message", new Schema<String>().type("string").example("요청에 성공했습니다."))
-                .addProperty("data", new Schema<>().description("엔드포인트별 응답 데이터"));
+                .addProperty("code", new IntegerSchema().example(0))
+                .addProperty("message", new StringSchema().example("요청에 성공했습니다."))
+                .addProperty("data", new ObjectSchema().description("엔드포인트별 응답 데이터"));
     }
 
     private Schema<?> pageResponseSchema() {
-        return new Schema<>()
-                .type("object")
+        return new ObjectSchema()
                 .description("페이지 기반 목록 공통 응답")
-                .addProperty("items", new ArraySchema().items(new Schema<>()))
-                .addProperty("page", new Schema<Integer>().type("integer"))
-                .addProperty("size", new Schema<Integer>().type("integer"))
-                .addProperty("totalElements", new Schema<Long>().type("integer").format("int64"))
-                .addProperty("totalPages", new Schema<Integer>().type("integer"))
-                .addProperty("hasNext", new Schema<Boolean>().type("boolean"));
+                .addProperty("items", new ArraySchema().items(new ObjectSchema()))
+                .addProperty("page", new IntegerSchema())
+                .addProperty("size", new IntegerSchema())
+                .addProperty("totalElements", new IntegerSchema().format("int64"))
+                .addProperty("totalPages", new IntegerSchema())
+                .addProperty("hasNext", new BooleanSchema());
     }
 
     private io.swagger.v3.oas.models.responses.ApiResponse reusableResponse(String description, String schemaReference) {
