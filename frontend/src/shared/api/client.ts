@@ -3,6 +3,7 @@ import createClient, {
   type ClientOptions,
 } from "openapi-fetch";
 
+import { createAuthorizationMiddleware } from "@/shared/api/authorization-middleware";
 import type { paths } from "@/shared/api/schema";
 
 export type TechViewApiClient = Client<paths>;
@@ -16,11 +17,15 @@ export function createTechViewApiClient(
     options.baseUrl ?? process.env.NEXT_PUBLIC_API_BASE_URL,
   );
 
-  return createClient<paths>({
+  const client = createClient<paths>({
     ...options,
     baseUrl,
     credentials: "include",
   });
+
+  client.use(createAuthorizationMiddleware());
+
+  return client;
 }
 
 export function getApiClient(): TechViewApiClient {
