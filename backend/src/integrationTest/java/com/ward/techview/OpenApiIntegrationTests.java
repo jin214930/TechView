@@ -41,7 +41,7 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
                 .andExpect(jsonPath("$.paths['/api/v1/interviews/{sessionId}/events'].get.responses['200'].content['text/event-stream']").exists())
-                .andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].post.parameters[?(@.name == 'refreshToken' && @.in == 'cookie')]").isNotEmpty())
+                .andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].post.parameters").doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.security[0].bearerAuth").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.responses", hasKey("400")))
                 .andExpect(jsonPath("$.paths['/api/v1/interviews'].post.responses", hasKey("401")))

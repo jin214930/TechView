@@ -12,14 +12,37 @@ concurrency:
   group: fast-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-# 소스 조회 외의 쓰기 권한은 부여하지 않습니다.
+# 소스 조회 및 PR 변경 경로 확인 권한을 설정합니다.
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  # Backend와 Frontend Job은 의존 관계가 없어 GitHub Actions에서 병렬로 실행됩니다.
+  # PR에서 변경된 경로를 감지합니다.
+  changes:
+    name: Detect Changed Paths
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - name: Check changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/**'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/**'
+
+  # Backend와 Frontend Job은 변경된 파일에 따라 선택적으로 실행됩니다.
   backend:
     name: Backend · Test
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -46,6 +69,8 @@ jobs:
 
   frontend:
     name: Frontend · Lint, Typecheck, Test
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
