@@ -13,6 +13,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -52,6 +53,9 @@ class OpenApiIntegrationTests {
                 .andExpect(jsonPath("$.paths['/api/v1/answers/{answerId}/upload-completion'].post.responses", hasKey("202")))
                 .andExpect(jsonPath("$.paths['/api/v1/answers/{answerId}/upload-completion'].post.responses", not(hasKey("200"))))
                 .andExpect(jsonPath("$.components.schemas.ApiErrorResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.ApiErrorResponse.properties.code.type").value("integer"))
+                .andExpect(jsonPath("$.components.schemas.ApiErrorResponse.properties.message.type").value("string"))
+                .andExpect(jsonPath("$.components.schemas.AnswerCreateRequest.required").value(hasItem("audioDurationMs")))
                 .andExpect(jsonPath("$.components.schemas.ApiResponseEnvelope").exists())
                 .andExpect(jsonPath("$.components.schemas.PageResponseEnvelope").exists());
     }
