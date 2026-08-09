@@ -22,34 +22,69 @@ interface InterviewAnswerTurnProps {
 
 type AnswerState = "idle" | "recording" | "recorded" | "uploading" | "submitted";
 
+interface PreparedAnswerState {
+  answerId: number;
+  recording: AudioAnswerRecording;
+}
+
 export function InterviewAnswerTurn({
   progress,
   voiceApi,
 }: InterviewAnswerTurnProps) {
   const recorderRef = useRef<AudioAnswerRecordingSession | null>(null);
+  const mountedRef = useRef(true);
+  const recordingRequestRef = useRef(0);
+  const previewUrlRef = useRef<string | null>(null);
   const [answerState, setAnswerState] = useState<AnswerState>("idle");
   const [recording, setRecording] = useState<AudioAnswerRecording | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [preparedAnswer, setPreparedAnswer] = useState<PreparedAnswerState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
+      recordingRequestRef.current += 1;
       recorderRef.current?.cancel();
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
       }
     };
-  }, [previewUrl]);
+  }, []);
+
+  function replacePreviewUrl(nextUrl: string | null) {
+    if (previewUrlRef.current && previewUrlRef.current !== nextUrl) {
+      URL.revokeObjectURL(previewUrlRef.current);
+    }
+    previewUrlRef.current = nextUrl;
+    setPreviewUrl(nextUrl);
+  }
 
   async function handleStartRecording() {
+    if (preparedAnswer) {
+      setError("현재 답변 업로드를 재시도한 후 다시 녹음할 수 있습니다.");
+      return;
+    }
+
+    const requestId = ++recordingRequestRef.current;
+    recorderRef.current?.cancel();
+    recorderRef.current = null;
     setError(null);
     setRecording(null);
-    setPreviewUrl(null);
+    replacePreviewUrl(null);
     setAnswerState("recording");
 
     try {
-      recorderRef.current = await startAudioAnswerRecording();
+      const recorder = await startAudioAnswerRecording();
+      if (!mountedRef.current || recordingRequestRef.current !== requestId) {
+        recorder.cancel();
+        return;
+      }
+      recorderRef.current = recorder;
     } catch (cause) {
+      if (!mountedRef.current || recordingRequestRef.current !== requestId) {
+        return;
+      }
       recorderRef.current = null;
       setAnswerState("idle");
       setError(getInterviewErrorMessage(cause));
@@ -64,19 +99,28 @@ export function InterviewAnswerTurn({
 
     try {
       const result = await recorder.stop();
+      if (!mountedRef.current) {
+        return;
+      }
       setRecording(result);
-      setPreviewUrl(URL.createObjectURL(result.blob));
+      replacePreviewUrl(URL.createObjectURL(result.blob));
       setAnswerState("recorded");
     } catch (cause) {
+      if (!mountedRef.current) {
+        return;
+      }
       setAnswerState("idle");
       setError(getInterviewErrorMessage(cause));
     } finally {
-      recorderRef.current = null;
+      if (recorderRef.current === recorder) {
+        recorderRef.current = null;
+      }
     }
   }
 
   async function handleSubmitAnswer() {
-    if (!recording || progress.turnId === null) {
+    const activeRecording = preparedAnswer?.recording ?? recording;
+    if (!activeRecording || progress.turnId === null) {
       setError("먼저 답변을 녹음해 주세요.");
       return;
     }
@@ -90,18 +134,31 @@ export function InterviewAnswerTurn({
         progress.sessionId,
         progress.turnId,
         {
-          audioContentType: recording.contentType,
-          audioDurationMs: recording.durationMs,
+          audioContentType: activeRecording.contentType,
+          audioDurationMs: activeRecording.durationMs,
         },
       );
+      if (!mountedRef.current) {
+        return;
+      }
+      setPreparedAnswer({
+        answerId: prepared.answerId,
+        recording: activeRecording,
+      });
       await resolvedVoiceApi.uploadAudio(
         prepared.uploadUrl,
-        recording.blob,
-        recording.contentType,
+        activeRecording.blob,
+        activeRecording.contentType,
       );
       await resolvedVoiceApi.completeAnswerUpload(prepared.answerId);
+      if (!mountedRef.current) {
+        return;
+      }
       setAnswerState("submitted");
     } catch (cause) {
+      if (!mountedRef.current) {
+        return;
+      }
       setAnswerState("recorded");
       setError(getInterviewErrorMessage(cause));
     }
@@ -182,7 +239,7 @@ export function InterviewAnswerTurn({
           <button
             type="button"
             onClick={() => void handleStartRecording()}
-            disabled={answerState === "uploading"}
+            disabled={answerState === "uploading" || preparedAnswer !== null}
             className="h-12 flex-1 rounded-xl border border-blue-200 bg-white text-sm font-bold text-blue-700 transition hover:border-blue-500 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {recording ? "다시 녹음하기" : "답변 녹음하기"}

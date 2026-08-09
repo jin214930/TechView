@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { startAudioAnswerRecording } from "@/features/interview/model/audio-answer-recorder";
+import {
+  MAX_AUDIO_DURATION_MS,
+  startAudioAnswerRecording,
+} from "@/features/interview/model/audio-answer-recorder";
 
 class FakeMediaRecorder {
   static isTypeSupported = vi.fn().mockReturnValue(true);
+  static lastInstance: FakeMediaRecorder | null = null;
 
   readonly mimeType = "audio/webm";
   state: RecordingState = "inactive";
@@ -11,7 +15,9 @@ class FakeMediaRecorder {
   onerror: (() => void) | null = null;
   onstop: (() => void) | null = null;
 
-  constructor(private readonly stream: MediaStream) {}
+  constructor(private readonly stream: MediaStream) {
+    FakeMediaRecorder.lastInstance = this;
+  }
 
   start() {
     this.state = "recording";
@@ -33,6 +39,8 @@ describe("startAudioAnswerRecording", () => {
     vi.unstubAllGlobals();
     Reflect.deleteProperty(navigator, "mediaDevices");
     FakeMediaRecorder.isTypeSupported.mockReturnValue(true);
+    FakeMediaRecorder.lastInstance = null;
+    vi.useRealTimers();
   });
 
   it("returns a WebM recording and releases microphone tracks on stop", async () => {
@@ -56,6 +64,29 @@ describe("startAudioAnswerRecording", () => {
     expect(result.blob.type).toBe("audio/webm");
     expect(result.blob.size).toBeGreaterThan(0);
     expect(result.durationMs).toBeGreaterThan(0);
+    expect(stopTrack).toHaveBeenCalledOnce();
+  });
+
+  it("automatically stops at the server audio duration limit", async () => {
+    vi.useFakeTimers();
+    const stopTrack = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop: stopTrack }],
+    } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+
+    vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+
+    const session = await startAudioAnswerRecording();
+    await vi.advanceTimersByTimeAsync(MAX_AUDIO_DURATION_MS);
+
+    expect(FakeMediaRecorder.lastInstance?.state).toBe("inactive");
+    const result = await session.stop();
+    expect(result.contentType).toBe("audio/webm");
     expect(stopTrack).toHaveBeenCalledOnce();
   });
 });

@@ -3,6 +3,8 @@ import {
   getSupportedWebmMimeType,
 } from "@/features/interview/model/audio-environment";
 
+export const MAX_AUDIO_DURATION_MS = 180_000;
+
 export interface AudioAnswerRecording {
   blob: Blob;
   contentType: "audio/webm";
@@ -43,6 +45,7 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
     const chunks: BlobPart[] = [];
     const startedAt = performance.now();
     let settled = false;
+    let stopTimer: number | undefined;
     let resolveStop!: (recording: AudioAnswerRecording) => void;
     let rejectStop!: (error: Error) => void;
 
@@ -53,6 +56,12 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
 
     const stopTracks = () => {
       stream.getTracks().forEach((track) => track.stop());
+    };
+
+    const clearStopTimer = () => {
+      if (stopTimer !== undefined) {
+        window.clearTimeout(stopTimer);
+      }
     };
 
     recorder.ondataavailable = (event) => {
@@ -66,6 +75,7 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
         return;
       }
       settled = true;
+      clearStopTimer();
       stopTracks();
       rejectStop(new AudioEnvironmentError("음성 녹음 중 오류가 발생했습니다."));
     };
@@ -75,6 +85,7 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
         return;
       }
       settled = true;
+      clearStopTimer();
       stopTracks();
 
       const blob = new Blob(chunks, { type: "audio/webm" });
@@ -86,12 +97,20 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
       resolveStop({
         blob,
         contentType: "audio/webm",
-        durationMs: Math.max(1, Math.round(performance.now() - startedAt)),
+        durationMs: Math.min(
+          MAX_AUDIO_DURATION_MS,
+          Math.max(1, Math.round(performance.now() - startedAt)),
+        ),
       });
     };
 
     try {
       recorder.start();
+      stopTimer = window.setTimeout(() => {
+        if (recorder.state === "recording") {
+          recorder.stop();
+        }
+      }, MAX_AUDIO_DURATION_MS);
     } catch {
       stopTracks();
       throw new AudioEnvironmentError("음성 녹음을 시작할 수 없습니다.");
@@ -109,6 +128,7 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
           return;
         }
         settled = true;
+        clearStopTimer();
         stopTracks();
         if (recorder.state === "recording") {
           recorder.stop();

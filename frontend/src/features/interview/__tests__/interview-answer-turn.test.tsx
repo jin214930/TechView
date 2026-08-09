@@ -38,6 +38,14 @@ function createVoiceApi() {
   };
 }
 
+function getButton(index: number): HTMLButtonElement {
+  const button = screen.getAllByRole("button")[index];
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Expected button at index ${index}`);
+  }
+  return button;
+}
+
 describe("InterviewAnswerTurn", () => {
   afterEach(() => {
     cleanup();
@@ -61,16 +69,15 @@ describe("InterviewAnswerTurn", () => {
 
     render(<InterviewAnswerTurn progress={progress} voiceApi={voiceApi} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "답변 녹음하기" }));
-    expect(
-      await screen.findByRole("button", { name: "녹음 끝내기" }),
-    ).toBeTruthy();
+    const recordButton = getButton(0);
+    fireEvent.click(recordButton);
+    await waitFor(() =>
+      expect(getButton(0).className).toContain("bg-rose-600"),
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "녹음 끝내기" }));
-    const submitButton = await screen.findByRole("button", {
-      name: "답변 제출하기",
-    });
-    expect((submitButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(getButton(0));
+    const submitButton = getButton(1);
+    await waitFor(() => expect(submitButton.disabled).toBe(false));
 
     fireEvent.click(submitButton);
 
@@ -86,10 +93,10 @@ describe("InterviewAnswerTurn", () => {
       blob,
       "audio/webm",
     );
-    expect(await screen.findByText("답변을 제출했습니다.")).toBeTruthy();
+    expect(screen.getByRole("status")).toBeTruthy();
   });
 
-  it("keeps the recording available when upload fails", async () => {
+  it("keeps the prepared recording retryable and disables re-recording after upload fails", async () => {
     const blob = new Blob(["audio"], { type: "audio/webm" });
     startRecordingMock.mockResolvedValue({
       stop: vi.fn().mockResolvedValue({
@@ -101,24 +108,53 @@ describe("InterviewAnswerTurn", () => {
     });
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:answer");
     const voiceApi = createVoiceApi();
-    voiceApi.uploadAudio.mockRejectedValue(
-      new Error("음성 답변 업로드에 실패했습니다."),
-    );
+    voiceApi.uploadAudio
+      .mockRejectedValueOnce(new Error("upload failed"))
+      .mockResolvedValueOnce(undefined);
 
     render(<InterviewAnswerTurn progress={progress} voiceApi={voiceApi} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "답변 녹음하기" }));
-    fireEvent.click(await screen.findByRole("button", { name: "녹음 끝내기" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "답변 제출하기" }),
+    fireEvent.click(getButton(0));
+    await waitFor(() =>
+      expect(getButton(0).className).toContain("bg-rose-600"),
+    );
+    fireEvent.click(getButton(0));
+    await waitFor(() =>
+      expect(getButton(1).disabled).toBe(false),
+    );
+    fireEvent.click(getButton(1));
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(getButton(0).disabled).toBe(true);
+
+    fireEvent.click(getButton(1));
+
+    expect(await screen.findByRole("status")).toBeTruthy();
+    expect(voiceApi.prepareAnswer).toHaveBeenCalledTimes(2);
+    expect(voiceApi.prepareAnswer).toHaveBeenNthCalledWith(2, 10, 21, {
+      audioContentType: "audio/webm",
+      audioDurationMs: 1000,
+    });
+    expect(voiceApi.uploadAudio).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels a recorder that resolves after the component unmounts", async () => {
+    let resolveRecorder!: (session: { cancel: () => void }) => void;
+    startRecordingMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRecorder = resolve;
+      }),
     );
 
-    expect(
-      await screen.findByText("면접 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."),
-    ).toBeTruthy();
-    expect(
-      (screen.getByRole("button", { name: "답변 제출하기" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(false);
+    const { unmount } = render(
+      <InterviewAnswerTurn progress={progress} voiceApi={createVoiceApi()} />,
+    );
+    fireEvent.click(getButton(0));
+    unmount();
+
+    const cancel = vi.fn();
+    resolveRecorder({ cancel });
+
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
   });
 });
