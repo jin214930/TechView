@@ -9,7 +9,7 @@ export default function Home() {
   const isAuthenticated = status === "authenticated";
 
   const mainButtonText = isAuthenticated ? "면접 보러가기" : "무료로 시작하기";
-  const mainButtonHref = isAuthenticated ? "/" : "/signup";
+  const mainButtonHref = isAuthenticated ? "/interviews" : "/signup";
 
   return (
     <main className="flex flex-1 flex-col items-center bg-slate-50/50 px-5 py-12 sm:px-8 sm:py-16">
@@ -64,4 +64,3 @@ export default function Home() {
     </main>
   );
 }
-

@@ -58,7 +58,6 @@ describe("Home", () => {
     );
 
     const button = await screen.findByRole("link", { name: "면접 보러가기" });
-    expect(button.getAttribute("href")).toBe("/");
+    expect(button.getAttribute("href")).toBe("/interviews");
   });
 });
-

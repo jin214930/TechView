@@ -23,6 +23,7 @@ import type {
   AuthMember,
   AuthStatus,
 } from "@/features/auth/model/auth-types";
+import { clearInterviewStart } from "@/features/interview/model/interview-session-storage";
 import {
   clearAccessToken,
   setAccessToken,
@@ -113,6 +114,7 @@ function AuthProviderState({
       await resolveApi().logout();
     } finally {
       clearAccessToken();
+      clearInterviewStart();
       setMember(null);
       setStatus("anonymous");
     }

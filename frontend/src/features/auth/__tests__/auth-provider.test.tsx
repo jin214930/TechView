@@ -118,11 +118,14 @@ describe("AuthProvider", () => {
     );
     expect(getAccessToken()).toBe("login-token");
 
+    window.sessionStorage.setItem("techview.interview.start", "stale-handoff");
+
     fireEvent.click(screen.getByRole("button", { name: "logout" }));
 
     await waitFor(() =>
       expect(screen.getByTestId("status").textContent).toBe("anonymous"),
     );
     expect(getAccessToken()).toBeUndefined();
+    expect(window.sessionStorage.getItem("techview.interview.start")).toBeNull();
   });
 });
