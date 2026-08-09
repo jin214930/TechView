@@ -1,10 +1,4 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthApi } from "@/features/auth/api/auth-api";
@@ -47,24 +41,8 @@ function createInterviewApi(
       startedAt: null,
       currentTurnOrder: null,
     }),
-    startOrResume: vi.fn().mockResolvedValue({
-      resumed: false,
-      sessionId: 10,
-      turnId: 21,
-      turnOrder: 1,
-      turnType: "CORE",
-      question: "Spring 설명을 해주세요.",
-    }),
-    getProgress: vi.fn().mockResolvedValue({
-      sessionId: 10,
-      status: "TURN_READY",
-      turnId: 21,
-      turnOrder: 1,
-      turnType: "CORE",
-      question: "Spring 설명을 해주세요.",
-      errorCode: null,
-      errorMessage: null,
-    }),
+    startOrResume: vi.fn(),
+    getProgress: vi.fn(),
     ...overrides,
   };
 }
@@ -100,28 +78,29 @@ describe("InterviewPreparation", () => {
     );
   });
 
-  it("shows the new interview action when there is no active session", async () => {
+  it("shows the environment setup action when there is no active session", async () => {
     const api = createInterviewApi();
     renderPreparation(api);
 
-    expect(await screen.findByRole("button", { name: "면접 시작하기" })).toBeTruthy();
+    expect(
+      await screen.findByRole("button", { name: "면접 환경 확인하기" }),
+    ).toBeTruthy();
     expect(api.getActive).toHaveBeenCalledOnce();
   });
 
-  it("stores the start response and navigates to the interview route", async () => {
+  it("opens the environment setup before creating a new interview", async () => {
     const api = createInterviewApi();
     renderPreparation(api);
 
-    fireEvent.click(await screen.findByRole("button", { name: "면접 시작하기" }));
-
-    await waitFor(() => expect(api.startOrResume).toHaveBeenCalledOnce());
-    expect(pushMock).toHaveBeenCalledWith("/interviews/10");
-    expect(window.sessionStorage.getItem("techview.interview.start")).toContain(
-      '"sessionId":10',
+    fireEvent.click(
+      await screen.findByRole("button", { name: "면접 환경 확인하기" }),
     );
+
+    expect(pushMock).toHaveBeenCalledWith("/interviews/setup");
+    expect(api.startOrResume).not.toHaveBeenCalled();
   });
 
-  it("shows the current turn when an active session exists", async () => {
+  it("opens the same environment setup for an active session", async () => {
     const api = createInterviewApi({
       getActive: vi.fn().mockResolvedValue({
         hasActiveSession: true,
@@ -132,8 +111,13 @@ describe("InterviewPreparation", () => {
     });
     renderPreparation(api);
 
-    expect(await screen.findByRole("button", { name: "면접 이어하기" })).toBeTruthy();
-    expect(screen.getByText("3번째 질문")).toBeTruthy();
-    expect(screen.getByText("진행 중인 면접")).toBeTruthy();
+    expect(
+      await screen.findByRole("button", { name: "면접 환경 확인하기" }),
+    ).toBeTruthy();
+    expect(screen.getByText("이어하기 전에도 음성 환경을 다시 확인합니다.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "면접 환경 확인하기" }));
+
+    expect(pushMock).toHaveBeenCalledWith("/interviews/setup");
   });
 });
