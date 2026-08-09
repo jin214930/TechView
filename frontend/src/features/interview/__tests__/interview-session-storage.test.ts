@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  clearInterviewStart,
   INTERVIEW_START_STORAGE_KEY,
   saveInterviewStart,
 } from "@/features/interview/model/interview-session-storage";
@@ -25,5 +26,13 @@ describe("interview session storage", () => {
     expect(window.sessionStorage.getItem(INTERVIEW_START_STORAGE_KEY)).toBe(
       JSON.stringify(start),
     );
+  });
+
+  it("clears the handoff after the client session ends", () => {
+    window.sessionStorage.setItem(INTERVIEW_START_STORAGE_KEY, "stale-handoff");
+
+    clearInterviewStart();
+
+    expect(window.sessionStorage.getItem(INTERVIEW_START_STORAGE_KEY)).toBeNull();
   });
 });

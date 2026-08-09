@@ -3,6 +3,8 @@ import type { TechViewApiClient } from "@/shared/api/client";
 import { unwrapApiResponse } from "@/shared/api/response";
 import type {
   ActiveInterview,
+  InterviewProgress,
+  InterviewProgressStatus,
   InterviewStart,
   InterviewTurnType,
 } from "@/features/interview/model/interview-types";
@@ -10,6 +12,7 @@ import type {
 export interface InterviewApi {
   getActive(): Promise<ActiveInterview>;
   startOrResume(): Promise<InterviewStart>;
+  getProgress(sessionId: number): Promise<InterviewProgress>;
 }
 
 export function createInterviewApi(client: TechViewApiClient): InterviewApi {
@@ -43,6 +46,25 @@ export function createInterviewApi(client: TechViewApiClient): InterviewApi {
         question: requireString(data?.question, "question"),
       };
     },
+
+    async getProgress(sessionId) {
+      const result = await client.GET(
+        "/api/v1/interviews/{sessionId}/progress",
+        { params: { path: { sessionId } } },
+      );
+      const data = unwrapApiResponse(result);
+
+      return {
+        sessionId: requireNumber(data?.sessionId, "sessionId"),
+        status: requireProgressStatus(data?.status),
+        turnId: optionalNumber(data?.turnId),
+        turnOrder: optionalNumber(data?.turnOrder),
+        turnType: optionalTurnType(data?.turnType),
+        question: data?.question ?? null,
+        errorCode: data?.errorCode ?? null,
+        errorMessage: data?.errorMessage ?? null,
+      };
+    },
   };
 }
 
@@ -74,4 +96,37 @@ function requireTurnType(
     throw new Error("API response has an invalid turnType");
   }
   return value;
+}
+
+function requireProgressStatus(
+  value: components["schemas"]["InterviewProgressResponse"]["status"],
+): InterviewProgressStatus {
+  if (
+    value !== "PROCESSING" &&
+    value !== "TURN_READY" &&
+    value !== "COMPLETED" &&
+    value !== "FAILED"
+  ) {
+    throw new Error("API response has an invalid interview progress status");
+  }
+  return value;
+}
+
+function optionalNumber(value: number | null | undefined): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value !== "number") {
+    throw new Error("API response has an invalid numeric field");
+  }
+  return value;
+}
+
+function optionalTurnType(
+  value: components["schemas"]["InterviewProgressResponse"]["turnType"],
+): InterviewTurnType | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return requireTurnType(value);
 }

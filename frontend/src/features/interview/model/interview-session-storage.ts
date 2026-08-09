@@ -8,3 +8,7 @@ export function saveInterviewStart(start: InterviewStart): void {
     JSON.stringify(start),
   );
 }
+
+export function clearInterviewStart(): void {
+  window.sessionStorage.removeItem(INTERVIEW_START_STORAGE_KEY);
+}

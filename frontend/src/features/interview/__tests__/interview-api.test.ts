@@ -17,7 +17,7 @@ describe("interviewApi", () => {
     const api = createApi(
       Response.json({
         code: 0,
-        message: "요청에 성공했습니다.",
+        message: "OK",
         data: {
           hasActiveSession: false,
           sessionId: null,
@@ -37,18 +37,19 @@ describe("interviewApi", () => {
 
   it("maps a new interview start response", async () => {
     const api = createApi(
-      Response.json({
-        code: 0,
-        message: "면접이 시작되었습니다.",
-        data: {
-          resumed: false,
-          sessionId: 10,
-          turnId: 21,
-          turnOrder: 1,
-          turnType: "CORE",
-          question: "Spring의 장점을 설명해 주세요.",
+      Response.json(
+        {
+          code: 0,
+          message: "Created",
+          data: {
+            resumed: false,
+            sessionId: 10,
+            turnId: 21,
+            turnOrder: 1,
+            turnType: "CORE",
+            question: "Spring 설명을 해주세요.",
+          },
         },
-      },
         { status: 201 },
       ),
     );
@@ -59,17 +60,61 @@ describe("interviewApi", () => {
       turnId: 21,
       turnOrder: 1,
       turnType: "CORE",
-      question: "Spring의 장점을 설명해 주세요.",
+      question: "Spring 설명을 해주세요.",
     });
   });
 
   it("rejects an active response without its state flag", async () => {
     const api = createApi(
-      Response.json({ code: 0, message: "요청에 성공했습니다.", data: {} }),
+      Response.json({ code: 0, message: "OK", data: {} }),
     );
 
     await expect(api.getActive()).rejects.toThrow(
       "API response is missing active interview state",
+    );
+  });
+
+  it("maps an owned interview progress response", async () => {
+    const api = createApi(
+      Response.json({
+        code: 0,
+        message: "OK",
+        data: {
+          sessionId: 10,
+          status: "TURN_READY",
+          turnId: 21,
+          turnOrder: 1,
+          turnType: "CORE",
+          question: "서버에서 확인한 질문",
+          errorCode: null,
+          errorMessage: null,
+        },
+      }),
+    );
+
+    await expect(api.getProgress(10)).resolves.toEqual({
+      sessionId: 10,
+      status: "TURN_READY",
+      turnId: 21,
+      turnOrder: 1,
+      turnType: "CORE",
+      question: "서버에서 확인한 질문",
+      errorCode: null,
+      errorMessage: null,
+    });
+  });
+
+  it("rejects a progress response with an unknown status", async () => {
+    const api = createApi(
+      Response.json({
+        code: 0,
+        message: "OK",
+        data: { sessionId: 10, status: "UNKNOWN" },
+      }),
+    );
+
+    await expect(api.getProgress(10)).rejects.toThrow(
+      "API response has an invalid interview progress status",
     );
   });
 });

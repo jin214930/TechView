@@ -7,9 +7,10 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { AuthApi } from "@/features/auth/api/auth-api";
+import { AuthProviderCore } from "@/features/auth/model/auth-context";
 import type { InterviewApi } from "@/features/interview/api/interview-api";
 import { InterviewPreparation } from "@/features/interview/ui/interview-preparation";
-import { AuthProviderCore } from "@/features/auth/model/auth-context";
 
 const { replaceMock, pushMock } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
@@ -23,10 +24,10 @@ vi.mock("next/navigation", () => ({
 const member = {
   id: 1,
   email: "user@example.com",
-  nickname: "테크뷰",
+  nickname: "테스트 사용자",
 };
 
-function createAuthApi() {
+function createAuthApi(): AuthApi {
   return {
     login: vi.fn(),
     signUp: vi.fn(),
@@ -36,7 +37,9 @@ function createAuthApi() {
   };
 }
 
-function createInterviewApi(overrides: Partial<InterviewApi> = {}): InterviewApi {
+function createInterviewApi(
+  overrides: Partial<InterviewApi> = {},
+): InterviewApi {
   return {
     getActive: vi.fn().mockResolvedValue({
       hasActiveSession: false,
@@ -50,7 +53,17 @@ function createInterviewApi(overrides: Partial<InterviewApi> = {}): InterviewApi
       turnId: 21,
       turnOrder: 1,
       turnType: "CORE",
-      question: "Spring의 장점을 설명해 주세요.",
+      question: "Spring 설명을 해주세요.",
+    }),
+    getProgress: vi.fn().mockResolvedValue({
+      sessionId: 10,
+      status: "TURN_READY",
+      turnId: 21,
+      turnOrder: 1,
+      turnType: "CORE",
+      question: "Spring 설명을 해주세요.",
+      errorCode: null,
+      errorMessage: null,
     }),
     ...overrides,
   };
@@ -74,7 +87,7 @@ describe("InterviewPreparation", () => {
 
   it("redirects anonymous users to login", async () => {
     const authApi = createAuthApi();
-    authApi.refresh.mockRejectedValue(new Error("no session"));
+    authApi.refresh = vi.fn().mockRejectedValue(new Error("no session"));
 
     render(
       <AuthProviderCore api={authApi}>
