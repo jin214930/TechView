@@ -8,6 +8,7 @@ import type {
   InterviewEvent,
   InterviewEventsApi,
 } from "@/features/interview/api/interview-events-api";
+import type { InterviewProgress } from "@/features/interview/model/interview-types";
 import { InterviewSessionHandoff } from "@/features/interview/ui/interview-session-handoff";
 import { ApiClientError } from "@/shared/api/response";
 
@@ -179,5 +180,66 @@ describe("InterviewSessionHandoff", () => {
 
     cleanup();
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("serializes overlapping progress refreshes and replays the latest event", async () => {
+    let onEvent!: (event: InterviewEvent) => void;
+    let resolveRefresh!: (progress: InterviewProgress) => void;
+    const refreshPromise = new Promise<InterviewProgress>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const eventsApi: InterviewEventsApi = {
+      subscribe: vi.fn((_sessionId, handlers) => {
+        onEvent = handlers.onEvent;
+        return { close: vi.fn() };
+      }),
+    };
+    const api = createInterviewApi({
+      getProgress: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sessionId: 10,
+          status: "TURN_READY",
+          turnId: 21,
+          turnOrder: 1,
+          turnType: "CORE",
+          question: "initial question",
+          errorCode: null,
+          errorMessage: null,
+        })
+        .mockReturnValueOnce(refreshPromise)
+        .mockResolvedValueOnce({
+          sessionId: 10,
+          status: "TURN_READY",
+          turnId: 22,
+          turnOrder: 2,
+          turnType: "CORE",
+          question: "next question",
+          errorCode: null,
+          errorMessage: null,
+        }),
+    });
+
+    renderHandoff(api, createAuthApi(), eventsApi);
+    await waitFor(() =>
+      expect(eventsApi.subscribe).toHaveBeenCalledWith(10, expect.any(Object)),
+    );
+
+    onEvent({ name: "progress-changed", sessionId: 10 });
+    onEvent({ name: "progress-changed", sessionId: 10 });
+    await waitFor(() => expect(api.getProgress).toHaveBeenCalledTimes(2));
+
+    resolveRefresh({
+      sessionId: 10,
+      status: "PROCESSING",
+      turnId: null,
+      turnOrder: null,
+      turnType: null,
+      question: null,
+      errorCode: null,
+      errorMessage: null,
+    });
+
+    await waitFor(() => expect(api.getProgress).toHaveBeenCalledTimes(3));
   });
 });

@@ -40,6 +40,11 @@ export function InterviewSessionHandoff({
   const eventsApiRef = useRef<InterviewEventsApi | null>(eventsApi ?? null);
   const loadedForAuthenticatedRef = useRef(false);
   const progressRef = useRef<InterviewProgress | null>(null);
+  const progressRefreshRef = useRef<Promise<void> | null>(null);
+  const progressRefreshQueuedRef = useRef(false);
+  const refreshProgressHandlerRef = useRef<(showLoading?: boolean) => void>(
+    () => undefined,
+  );
   const [progress, setProgress] = useState<InterviewProgress | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +100,32 @@ export function InterviewSessionHandoff({
     }
   }, [resolveApi, sessionId]);
 
+  const refreshProgress = useCallback(
+    (showLoading = false) => {
+      if (progressRefreshRef.current) {
+        progressRefreshQueuedRef.current = true;
+        return;
+      }
+
+      const request = loadProgress(showLoading);
+      progressRefreshRef.current = request.finally(() => {
+        progressRefreshRef.current = null;
+        if (progressRefreshQueuedRef.current) {
+          progressRefreshQueuedRef.current = false;
+          refreshProgressHandlerRef.current(false);
+        }
+      });
+    },
+    [loadProgress],
+  );
+
+  useEffect(() => {
+    refreshProgressHandlerRef.current = refreshProgress;
+    return () => {
+      refreshProgressHandlerRef.current = () => undefined;
+    };
+  }, [refreshProgress]);
+
   useEffect(() => {
     if (status === "loading") {
       return;
@@ -113,8 +144,8 @@ export function InterviewSessionHandoff({
     }
 
     loadedForAuthenticatedRef.current = true;
-    void loadProgress();
-  }, [loadProgress, router, sessionId, status]);
+    refreshProgress(true);
+  }, [refreshProgress, router, sessionId, status]);
 
   useEffect(() => {
     if (status !== "authenticated" || isLoading || error) {
@@ -136,17 +167,17 @@ export function InterviewSessionHandoff({
         if (event.sessionId !== numericSessionId) {
           return;
         }
-        void loadProgress(false);
+        refreshProgress(false);
       },
       onError() {
         if (progressRef.current) {
-          void loadProgress(false);
+          refreshProgress(false);
         }
       },
     });
 
     return () => subscription.close();
-  }, [error, isLoading, loadProgress, resolveEventsApi, sessionId, status]);
+  }, [error, isLoading, refreshProgress, resolveEventsApi, sessionId, status]);
 
   return (
     <main className="flex flex-1 items-center bg-slate-50 px-5 py-12 sm:px-8 sm:py-16">
