@@ -11,6 +11,10 @@ import {
 import {
   type InterviewVoiceApi,
 } from "@/features/interview/api/interview-voice-api";
+import {
+  createInterviewEventsApi,
+  type InterviewEventsApi,
+} from "@/features/interview/api/interview-events-api";
 import { getInterviewErrorMessage } from "@/features/interview/model/interview-error";
 import { clearInterviewStart } from "@/features/interview/model/interview-session-storage";
 import type { InterviewProgress } from "@/features/interview/model/interview-types";
@@ -21,17 +25,26 @@ interface InterviewSessionHandoffProps {
   sessionId: string;
   api?: InterviewApi;
   voiceApi?: InterviewVoiceApi;
+  eventsApi?: InterviewEventsApi;
 }
 
 export function InterviewSessionHandoff({
   sessionId,
   api,
   voiceApi,
+  eventsApi,
 }: InterviewSessionHandoffProps) {
   const router = useRouter();
   const { status } = useAuth();
   const apiRef = useRef<InterviewApi | null>(api ?? null);
+  const eventsApiRef = useRef<InterviewEventsApi | null>(eventsApi ?? null);
   const loadedForAuthenticatedRef = useRef(false);
+  const progressRef = useRef<InterviewProgress | null>(null);
+  const progressRefreshRef = useRef<Promise<void> | null>(null);
+  const progressRefreshQueuedRef = useRef(false);
+  const refreshProgressHandlerRef = useRef<(showLoading?: boolean) => void>(
+    () => undefined,
+  );
   const [progress, setProgress] = useState<InterviewProgress | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +54,21 @@ export function InterviewSessionHandoff({
     return apiRef.current;
   }, [api]);
 
-  const loadProgress = useCallback(async () => {
+  const resolveEventsApi = useCallback(() => {
+    if (eventsApiRef.current) {
+      return eventsApiRef.current;
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (!baseUrl) {
+      return null;
+    }
+
+    eventsApiRef.current = createInterviewEventsApi({ baseUrl });
+    return eventsApiRef.current;
+  }, []);
+
+  const loadProgress = useCallback(async (showLoading = true) => {
     const numericSessionId = Number(sessionId);
     if (!Number.isSafeInteger(numericSessionId) || numericSessionId <= 0) {
       clearInterviewStart();
@@ -50,20 +77,54 @@ export function InterviewSessionHandoff({
       return;
     }
 
-    setError(null);
-    setIsLoading(true);
+    if (showLoading) {
+      setError(null);
+      setIsLoading(true);
+    }
 
     try {
       const result = await resolveApi().getProgress(numericSessionId);
+      progressRef.current = result;
       setProgress(result);
     } catch (cause) {
-      clearInterviewStart();
-      setProgress(null);
-      setError(getInterviewErrorMessage(cause));
+      if (showLoading || !progressRef.current) {
+        clearInterviewStart();
+        progressRef.current = null;
+        setProgress(null);
+        setError(getInterviewErrorMessage(cause));
+      }
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   }, [resolveApi, sessionId]);
+
+  const refreshProgress = useCallback(
+    (showLoading = false) => {
+      if (progressRefreshRef.current) {
+        progressRefreshQueuedRef.current = true;
+        return;
+      }
+
+      const request = loadProgress(showLoading);
+      progressRefreshRef.current = request.finally(() => {
+        progressRefreshRef.current = null;
+        if (progressRefreshQueuedRef.current) {
+          progressRefreshQueuedRef.current = false;
+          refreshProgressHandlerRef.current(false);
+        }
+      });
+    },
+    [loadProgress],
+  );
+
+  useEffect(() => {
+    refreshProgressHandlerRef.current = refreshProgress;
+    return () => {
+      refreshProgressHandlerRef.current = () => undefined;
+    };
+  }, [refreshProgress]);
 
   useEffect(() => {
     if (status === "loading") {
@@ -83,8 +144,40 @@ export function InterviewSessionHandoff({
     }
 
     loadedForAuthenticatedRef.current = true;
-    void loadProgress();
-  }, [loadProgress, router, sessionId, status]);
+    refreshProgress(true);
+  }, [refreshProgress, router, sessionId, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || isLoading || error) {
+      return;
+    }
+
+    const numericSessionId = Number(sessionId);
+    if (!Number.isSafeInteger(numericSessionId) || numericSessionId <= 0) {
+      return;
+    }
+
+    const resolvedEventsApi = resolveEventsApi();
+    if (!resolvedEventsApi) {
+      return;
+    }
+
+    const subscription = resolvedEventsApi.subscribe(numericSessionId, {
+      onEvent(event) {
+        if (event.sessionId !== numericSessionId) {
+          return;
+        }
+        refreshProgress(false);
+      },
+      onError() {
+        if (progressRef.current) {
+          refreshProgress(false);
+        }
+      },
+    });
+
+    return () => subscription.close();
+  }, [error, isLoading, refreshProgress, resolveEventsApi, sessionId, status]);
 
   return (
     <main className="flex flex-1 items-center bg-slate-50 px-5 py-12 sm:px-8 sm:py-16">
@@ -111,7 +204,11 @@ export function InterviewSessionHandoff({
         ) : null}
 
         {status === "authenticated" && !isLoading && !error && progress ? (
-          <ProgressState progress={progress} voiceApi={voiceApi} />
+          <ProgressState
+            key={`${progress.status}-${progress.turnId ?? "none"}`}
+            progress={progress}
+            voiceApi={voiceApi}
+          />
         ) : null}
       </section>
     </main>
