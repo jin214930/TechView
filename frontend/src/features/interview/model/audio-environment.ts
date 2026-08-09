@@ -27,6 +27,13 @@ export async function testMicrophoneEnvironment(
     );
   }
 
+  const mimeType = resolveMimeType();
+  if (!mimeType) {
+    throw new AudioEnvironmentError(
+      "이 브라우저에서는 audio/webm 음성 녹음을 지원하지 않습니다.",
+    );
+  }
+
   const stream = await navigator.mediaDevices
     .getUserMedia({ audio: true })
     .catch(() => {
@@ -36,10 +43,7 @@ export async function testMicrophoneEnvironment(
     });
 
   try {
-    const mimeType = resolveMimeType();
-    const recorder = mimeType
-      ? new MediaRecorder(stream, { mimeType })
-      : new MediaRecorder(stream);
+    const recorder = new MediaRecorder(stream, { mimeType });
     const chunks: BlobPart[] = [];
     const startedAt = performance.now();
 
@@ -86,7 +90,7 @@ export async function testMicrophoneEnvironment(
         stopTracks();
 
         const blob = new Blob(chunks, {
-          type: recorder.mimeType || mimeType || "audio/webm",
+          type: recorder.mimeType || mimeType,
         });
         if (blob.size === 0) {
           reject(new AudioEnvironmentError("녹음된 음성을 확인할 수 없습니다."));

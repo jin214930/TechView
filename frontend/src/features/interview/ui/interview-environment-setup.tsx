@@ -17,7 +17,7 @@ interface InterviewEnvironmentSetupProps {
   api?: InterviewApi;
 }
 
-type MicrophoneTestState = "idle" | "recording" | "passed";
+type MicrophoneTestState = "idle" | "recording" | "recorded" | "passed";
 
 export function InterviewEnvironmentSetup({
   api,
@@ -28,6 +28,7 @@ export function InterviewEnvironmentSetup({
   const [microphoneState, setMicrophoneState] =
     useState<MicrophoneTestState>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isPlaybackReady, setIsPlaybackReady] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,21 +54,41 @@ export function InterviewEnvironmentSetup({
   async function handleMicrophoneTest() {
     setError(null);
     setPreviewUrl(null);
+    setIsPlaybackReady(false);
     setMicrophoneState("recording");
 
     try {
       const result = await testMicrophoneEnvironment();
       setPreviewUrl(URL.createObjectURL(result.blob));
-      setMicrophoneState("passed");
+      setMicrophoneState("recorded");
     } catch (cause) {
       setMicrophoneState("idle");
       setError(getInterviewErrorMessage(cause));
     }
   }
 
+  function handlePlaybackReady() {
+    setIsPlaybackReady(true);
+  }
+
+  function handlePlaybackError() {
+    setIsPlaybackReady(false);
+    setMicrophoneState("recorded");
+    setError("테스트 음성을 재생할 수 없습니다. 다시 테스트해 주세요.");
+  }
+
+  function handleAudibleConfirmation(checked: boolean) {
+    if (!checked || !isPlaybackReady) {
+      setMicrophoneState("recorded");
+      return;
+    }
+    setError(null);
+    setMicrophoneState("passed");
+  }
+
   async function handleStartInterview() {
     if (microphoneState !== "passed") {
-      setError("먼저 마이크 테스트를 완료해 주세요.");
+      setError("테스트 음성을 재생한 후 소리가 잘 들리는지 확인해 주세요.");
       return;
     }
 
@@ -97,6 +118,8 @@ export function InterviewEnvironmentSetup({
     );
   }
 
+  const hasRecording = microphoneState === "recorded" || microphoneState === "passed";
+
   return (
     <main className="flex flex-1 items-center bg-slate-50 px-5 py-12 sm:px-8 sm:py-16">
       <section className="mx-auto w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_24px_80px_-30px_rgba(30,64,175,0.28)] sm:p-9">
@@ -125,18 +148,37 @@ export function InterviewEnvironmentSetup({
             </p>
           ) : null}
 
-          {microphoneState === "passed" && previewUrl ? (
+          {hasRecording && previewUrl ? (
             <div className="space-y-4">
-              <p className="font-semibold text-emerald-700">
-                음성 환경 테스트가 완료되었습니다.
-              </p>
+              {microphoneState === "passed" ? (
+                <p className="font-semibold text-emerald-700">
+                  음성 환경 테스트가 완료되었습니다.
+                </p>
+              ) : (
+                <p className="font-semibold text-slate-700">
+                  녹음된 음성을 재생하고 소리를 확인해 주세요.
+                </p>
+              )}
               <audio
                 controls
                 preload="metadata"
                 src={previewUrl}
                 aria-label="음성 환경 테스트 녹음"
+                onCanPlay={handlePlaybackReady}
+                onError={handlePlaybackError}
                 className="mx-auto w-full max-w-md"
               />
+              <label className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={microphoneState === "passed"}
+                  disabled={!isPlaybackReady || isStarting}
+                  onChange={(event) =>
+                    handleAudibleConfirmation(event.target.checked)
+                  }
+                />
+                소리가 잘 들려요.
+              </label>
             </div>
           ) : null}
 
@@ -146,9 +188,7 @@ export function InterviewEnvironmentSetup({
               onClick={() => void handleMicrophoneTest()}
               className="h-12 w-full max-w-md rounded-xl border border-blue-200 bg-white px-5 text-sm font-bold text-blue-700 transition hover:border-blue-500 hover:bg-blue-50"
             >
-              {microphoneState === "passed"
-                ? "다시 테스트하기"
-                : "마이크 테스트 시작"}
+              {hasRecording ? "다시 테스트하기" : "마이크 테스트 시작"}
             </button>
           ) : null}
         </div>

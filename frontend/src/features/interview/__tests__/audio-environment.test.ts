@@ -36,6 +36,7 @@ describe("testMicrophoneEnvironment", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     Reflect.deleteProperty(navigator, "mediaDevices");
+    FakeMediaRecorder.isTypeSupported.mockReturnValue(true);
   });
 
   it("records a short sample and stops every microphone track", async () => {
@@ -72,6 +73,23 @@ describe("testMicrophoneEnvironment", () => {
     await expect(testMicrophoneEnvironment()).rejects.toEqual(
       new AudioEnvironmentError("이 브라우저에서는 마이크를 사용할 수 없습니다."),
     );
+  });
+
+  it("rejects when the browser cannot record WebM", async () => {
+    const getUserMedia = vi.fn();
+    FakeMediaRecorder.isTypeSupported.mockReturnValue(false);
+    vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+
+    await expect(testMicrophoneEnvironment()).rejects.toEqual(
+      new AudioEnvironmentError(
+        "이 브라우저에서는 audio/webm 음성 녹음을 지원하지 않습니다.",
+      ),
+    );
+    expect(getUserMedia).not.toHaveBeenCalled();
   });
 
   it("turns a denied microphone permission into a user-facing error", async () => {

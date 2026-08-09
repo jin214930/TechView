@@ -1,11 +1,12 @@
 import { ApiClientError } from "@/shared/api/response";
+import { AudioEnvironmentError } from "@/features/interview/model/audio-environment";
 
 export function getInterviewErrorMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
     return error.message;
   }
 
-  if (error instanceof Error && error.message) {
+  if (error instanceof AudioEnvironmentError) {
     return error.message;
   }
 

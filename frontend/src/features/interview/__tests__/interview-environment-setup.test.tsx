@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthApi } from "@/features/auth/api/auth-api";
 import { AuthProviderCore } from "@/features/auth/model/auth-context";
 import type { InterviewApi } from "@/features/interview/api/interview-api";
+import {
+  AudioEnvironmentError,
+} from "@/features/interview/model/audio-environment";
 import { InterviewEnvironmentSetup } from "@/features/interview/ui/interview-environment-setup";
 
 const { replaceMock, pushMock, testMicrophoneEnvironmentMock } = vi.hoisted(
@@ -18,9 +21,15 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: replaceMock, push: pushMock }),
 }));
 
-vi.mock("@/features/interview/model/audio-environment", () => ({
-  testMicrophoneEnvironment: testMicrophoneEnvironmentMock,
-}));
+vi.mock("@/features/interview/model/audio-environment", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/features/interview/model/audio-environment")
+  >("@/features/interview/model/audio-environment");
+  return {
+    ...actual,
+    testMicrophoneEnvironment: testMicrophoneEnvironmentMock,
+  };
+});
 
 const member = {
   id: 1,
@@ -94,7 +103,7 @@ describe("InterviewEnvironmentSetup", () => {
     expect(screen.getByText("로그인 페이지로 이동하고 있습니다.")).toBeTruthy();
   });
 
-  it("requires a successful microphone test before starting or resuming", async () => {
+  it("requires playback confirmation before starting or resuming", async () => {
     const api = createInterviewApi();
     testMicrophoneEnvironmentMock.mockResolvedValue({
       blob: new Blob(["test audio"], { type: "audio/webm" }),
@@ -108,9 +117,22 @@ describe("InterviewEnvironmentSetup", () => {
       name: "면접 시작하기",
     });
     expect((startButton as HTMLButtonElement).disabled).toBe(true);
-    expect(api.startOrResume).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "마이크 테스트 시작" }));
+    expect(
+      await screen.findByText("녹음된 음성을 재생하고 소리를 확인해 주세요."),
+    ).toBeTruthy();
+    expect((startButton as HTMLButtonElement).disabled).toBe(true);
+
+    const audio = screen.getByLabelText("음성 환경 테스트 녹음");
+    fireEvent.canPlay(audio);
+    const confirmation = screen.getByRole("checkbox", {
+      name: "소리가 잘 들려요.",
+    });
+    expect((confirmation as HTMLInputElement).disabled).toBe(false);
+    expect((startButton as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(confirmation);
     expect(
       await screen.findByText("음성 환경 테스트가 완료되었습니다."),
     ).toBeTruthy();
@@ -128,7 +150,9 @@ describe("InterviewEnvironmentSetup", () => {
   it("blocks the interview when microphone permission is denied", async () => {
     const api = createInterviewApi();
     testMicrophoneEnvironmentMock.mockRejectedValue(
-      new Error("마이크 권한을 허용해야 면접을 진행할 수 있습니다."),
+      new AudioEnvironmentError(
+        "마이크 권한을 허용해야 면접을 진행할 수 있습니다.",
+      ),
     );
 
     renderSetup(api);
