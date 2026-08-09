@@ -18,7 +18,7 @@ export default async function InterviewHistoryPage({
   return (
     <InterviewHistory
       page={parseQueryNumber(params.page, 0, 0)}
-      size={parseQueryNumber(params.size, 10, 1)}
+      size={parseQueryNumber(params.size, 10, 1, 100)}
     />
   );
 }
@@ -27,10 +27,14 @@ function parseQueryNumber(
   value: string | undefined,
   fallback: number,
   minimum: number,
+  maximum?: number,
 ): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < minimum) {
     return fallback;
+  }
+  if (maximum !== undefined && parsed > maximum) {
+    return maximum;
   }
   return parsed;
 }

@@ -75,6 +75,41 @@ describe("InterviewHistory", () => {
     );
   });
 
+  it("renders pagination links when more history pages are available", async () => {
+    const api = createFeedbackApi({
+      getHistory: vi.fn().mockResolvedValue({
+        items: [
+          {
+            sessionId: 10,
+            startedAt: "2026-08-09T10:00:00+09:00",
+            completedAt: "2026-08-09T10:15:00+09:00",
+            feedbackStatus: "COMPLETED",
+          },
+        ],
+        page: 1,
+        size: 10,
+        totalElements: 21,
+        totalPages: 3,
+        hasNext: true,
+      }),
+    });
+
+    render(
+      <AuthProviderCore api={createAuthApi()}>
+        <InterviewHistory page={1} size={10} api={api} />
+      </AuthProviderCore>,
+    );
+
+    expect(
+      (await screen.findByRole("link", { name: "Previous" })).getAttribute(
+        "href",
+      ),
+    ).toBe("/interviews/history?page=0&size=10");
+    expect(screen.getByRole("link", { name: "Next" }).getAttribute("href")).toBe(
+      "/interviews/history?page=2&size=10",
+    );
+  });
+
   it("redirects anonymous users with the current pagination query", async () => {
     const api = createFeedbackApi();
     const authApi = createAuthApi({

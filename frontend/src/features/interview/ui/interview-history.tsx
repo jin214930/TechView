@@ -126,15 +126,67 @@ export function InterviewHistory({ page, size, api }: InterviewHistoryProps) {
           ) : null}
 
           {!isLoading && !error && history?.items.length ? (
-            <div className="space-y-3" aria-label="면접 기록 목록">
-              {history.items.map((item) => (
-                <HistoryItemCard key={item.sessionId} item={item} />
-              ))}
-            </div>
+            <>
+              <div className="space-y-3" aria-label="면접 기록 목록">
+                {history.items.map((item) => (
+                  <HistoryItemCard key={item.sessionId} item={item} />
+                ))}
+              </div>
+              <HistoryPagination
+                page={history.page}
+                size={history.size}
+                totalPages={history.totalPages}
+                hasNext={history.hasNext}
+              />
+            </>
           ) : null}
         </div>
       </section>
     </main>
+  );
+}
+
+function HistoryPagination({
+  page,
+  size,
+  totalPages,
+  hasNext,
+}: Pick<InterviewHistoryPage, "page" | "size" | "totalPages" | "hasNext">) {
+  const hasPrevious = page > 0;
+
+  if (!hasPrevious && !hasNext) {
+    return null;
+  }
+
+  return (
+    <nav
+      aria-label="Interview history pagination"
+      className="mt-6 flex items-center justify-between border-t border-slate-100 pt-5"
+    >
+      {hasPrevious ? (
+        <Link
+          href={`/interviews/history?page=${page - 1}&size=${size}`}
+          className="rounded-lg px-3 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50"
+        >
+          Previous
+        </Link>
+      ) : (
+        <span />
+      )}
+      <span className="text-sm text-slate-500">
+        Page {page + 1} of {totalPages}
+      </span>
+      {hasNext ? (
+        <Link
+          href={`/interviews/history?page=${page + 1}&size=${size}`}
+          className="rounded-lg px-3 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50"
+        >
+          Next
+        </Link>
+      ) : (
+        <span />
+      )}
+    </nav>
   );
 }
 
