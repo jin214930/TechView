@@ -15,7 +15,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z
     container_name: minio-container
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -29,7 +29,7 @@ services:
       - minio-data:/data
 
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     container_name: minio-init
     depends_on:
       - minio
