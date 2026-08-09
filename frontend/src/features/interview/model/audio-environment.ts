@@ -27,7 +27,7 @@ export async function testMicrophoneEnvironment(
     );
   }
 
-  const mimeType = resolveMimeType();
+  const mimeType = getSupportedWebmMimeType();
   if (!mimeType) {
     throw new AudioEnvironmentError(
       "이 브라우저에서는 audio/webm 음성 녹음을 지원하지 않습니다.",
@@ -123,11 +123,11 @@ export async function testMicrophoneEnvironment(
   }
 }
 
-function resolveMimeType(): string {
+export function getSupportedWebmMimeType(): string | null {
   const candidates = ["audio/webm;codecs=opus", "audio/webm"];
   return (
     candidates.find((candidate) =>
       MediaRecorder.isTypeSupported?.(candidate),
-    ) ?? ""
+    ) ?? null
   );
 }

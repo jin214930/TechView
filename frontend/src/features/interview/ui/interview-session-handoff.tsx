@@ -4,20 +4,29 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/features/auth/model/auth-context";
-import { createInterviewApi, type InterviewApi } from "@/features/interview/api/interview-api";
+import {
+  createInterviewApi,
+  type InterviewApi,
+} from "@/features/interview/api/interview-api";
+import {
+  type InterviewVoiceApi,
+} from "@/features/interview/api/interview-voice-api";
 import { getInterviewErrorMessage } from "@/features/interview/model/interview-error";
 import { clearInterviewStart } from "@/features/interview/model/interview-session-storage";
 import type { InterviewProgress } from "@/features/interview/model/interview-types";
 import { getApiClient } from "@/shared/api/client";
+import { InterviewAnswerTurn } from "@/features/interview/ui/interview-answer-turn";
 
 interface InterviewSessionHandoffProps {
   sessionId: string;
   api?: InterviewApi;
+  voiceApi?: InterviewVoiceApi;
 }
 
 export function InterviewSessionHandoff({
   sessionId,
   api,
+  voiceApi,
 }: InterviewSessionHandoffProps) {
   const router = useRouter();
   const { status } = useAuth();
@@ -102,31 +111,22 @@ export function InterviewSessionHandoff({
         ) : null}
 
         {status === "authenticated" && !isLoading && !error && progress ? (
-          <ProgressState progress={progress} />
+          <ProgressState progress={progress} voiceApi={voiceApi} />
         ) : null}
       </section>
     </main>
   );
 }
 
-function ProgressState({ progress }: { progress: InterviewProgress }) {
+function ProgressState({
+  progress,
+  voiceApi,
+}: {
+  progress: InterviewProgress;
+  voiceApi?: InterviewVoiceApi;
+}) {
   if (progress.status === "TURN_READY" && progress.question) {
-    return (
-      <>
-        <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">
-          Question {progress.turnOrder ?? "-"}
-        </p>
-        <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-          질문이 준비되었습니다.
-        </h1>
-        <p className="mx-auto mt-6 max-w-2xl rounded-2xl bg-slate-50 px-5 py-6 text-lg font-semibold leading-8 text-slate-800">
-          {progress.question}
-        </p>
-        <p className="mt-6 text-sm leading-6 text-slate-500">
-          음성 답변 화면은 다음 단계에서 연결됩니다.
-        </p>
-      </>
-    );
+    return <InterviewAnswerTurn progress={progress} voiceApi={voiceApi} />;
   }
 
   if (progress.status === "PROCESSING") {
