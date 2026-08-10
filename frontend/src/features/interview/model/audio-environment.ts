@@ -1,8 +1,14 @@
-export const MICROPHONE_TEST_DURATION_MS = 1000;
+export const MICROPHONE_TEST_DURATION_MS = 60_000;
 
 export interface MicrophoneTestResult {
   blob: Blob;
   durationMs: number;
+}
+
+export interface MicrophoneTestSession {
+  result: Promise<MicrophoneTestResult>;
+  stop(): Promise<MicrophoneTestResult>;
+  cancel(): void;
 }
 
 export class AudioEnvironmentError extends Error {
@@ -12,9 +18,9 @@ export class AudioEnvironmentError extends Error {
   }
 }
 
-export async function testMicrophoneEnvironment(
-  durationMs = MICROPHONE_TEST_DURATION_MS,
-): Promise<MicrophoneTestResult> {
+export async function startMicrophoneEnvironmentTest(
+  maxDurationMs = MICROPHONE_TEST_DURATION_MS,
+): Promise<MicrophoneTestSession> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new AudioEnvironmentError(
       "이 브라우저에서는 마이크를 사용할 수 없습니다.",
@@ -46,74 +52,108 @@ export async function testMicrophoneEnvironment(
     const recorder = new MediaRecorder(stream, { mimeType });
     const chunks: BlobPart[] = [];
     const startedAt = performance.now();
+    let settled = false;
+    let tracksStopped = false;
+    let stopTimer: number | undefined;
+    let resolveResult!: (result: MicrophoneTestResult) => void;
+    let rejectResult!: (error: Error) => void;
 
-    return await new Promise<MicrophoneTestResult>((resolve, reject) => {
-      let settled = false;
-      let stopTimer: number | undefined;
-
-      const stopTracks = () => {
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      const settleFailure = (error: Error) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        if (stopTimer !== undefined) {
-          window.clearTimeout(stopTimer);
-        }
-        stopTracks();
-        reject(error);
-      };
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
-      };
-
-      recorder.onerror = () => {
-        settleFailure(
-          new AudioEnvironmentError("음성 녹음 중 오류가 발생했습니다."),
-        );
-      };
-
-      recorder.onstop = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        if (stopTimer !== undefined) {
-          window.clearTimeout(stopTimer);
-        }
-        stopTracks();
-
-        const blob = new Blob(chunks, {
-          type: recorder.mimeType || mimeType,
-        });
-        if (blob.size === 0) {
-          reject(new AudioEnvironmentError("녹음된 음성을 확인할 수 없습니다."));
-          return;
-        }
-
-        resolve({
-          blob,
-          durationMs: Math.max(1, Math.round(performance.now() - startedAt)),
-        });
-      };
-
-      try {
-        recorder.start();
-        stopTimer = window.setTimeout(() => {
-          if (recorder.state === "recording") {
-            recorder.stop();
-          }
-        }, durationMs);
-      } catch {
-        settleFailure(new AudioEnvironmentError("음성 녹음을 시작할 수 없습니다."));
-      }
+    const result = new Promise<MicrophoneTestResult>((resolve, reject) => {
+      resolveResult = resolve;
+      rejectResult = reject;
     });
+
+    const stopTracks = () => {
+      if (tracksStopped) {
+        return;
+      }
+      tracksStopped = true;
+      stream.getTracks().forEach((track) => track.stop());
+    };
+
+    const clearStopTimer = () => {
+      if (stopTimer !== undefined) {
+        window.clearTimeout(stopTimer);
+      }
+    };
+
+    const settleFailure = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearStopTimer();
+      stopTracks();
+      rejectResult(error);
+    };
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    };
+
+    recorder.onerror = () => {
+      settleFailure(new AudioEnvironmentError("음성 녹음 중 오류가 발생했습니다."));
+    };
+
+    recorder.onstop = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearStopTimer();
+      stopTracks();
+
+      const blob = new Blob(chunks, {
+        type: recorder.mimeType || mimeType,
+      });
+      if (blob.size === 0) {
+        rejectResult(new AudioEnvironmentError("녹음된 음성을 확인할 수 없습니다."));
+        return;
+      }
+
+      resolveResult({
+        blob,
+        durationMs: Math.min(
+          maxDurationMs,
+          Math.max(1, Math.round(performance.now() - startedAt)),
+        ),
+      });
+    };
+
+    try {
+      recorder.start();
+      stopTimer = window.setTimeout(() => {
+        if (recorder.state === "recording") {
+          recorder.stop();
+        }
+      }, maxDurationMs);
+    } catch {
+      stopTracks();
+      throw new AudioEnvironmentError("음성 녹음을 시작할 수 없습니다.");
+    }
+
+    return {
+      result,
+      stop() {
+        if (!settled && recorder.state === "recording") {
+          recorder.stop();
+        }
+        return result;
+      },
+      cancel() {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearStopTimer();
+        stopTracks();
+        if (recorder.state === "recording") {
+          recorder.stop();
+        }
+      },
+    };
   } catch (cause) {
     stream.getTracks().forEach((track) => track.stop());
     if (cause instanceof AudioEnvironmentError) {
@@ -121,6 +161,13 @@ export async function testMicrophoneEnvironment(
     }
     throw new AudioEnvironmentError("음성 환경을 확인할 수 없습니다.");
   }
+}
+
+export async function testMicrophoneEnvironment(
+  maxDurationMs = MICROPHONE_TEST_DURATION_MS,
+): Promise<MicrophoneTestResult> {
+  const session = await startMicrophoneEnvironmentTest(maxDurationMs);
+  return session.result;
 }
 
 export function getSupportedWebmMimeType(): string | null {

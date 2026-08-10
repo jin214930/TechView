@@ -9,7 +9,11 @@ import {
   type InterviewApi,
 } from "@/features/interview/api/interview-api";
 import { getInterviewErrorMessage } from "@/features/interview/model/interview-error";
-import { testMicrophoneEnvironment } from "@/features/interview/model/audio-environment";
+import {
+  MICROPHONE_TEST_DURATION_MS,
+  startMicrophoneEnvironmentTest,
+  type MicrophoneTestSession,
+} from "@/features/interview/model/audio-environment";
 import { saveInterviewStart } from "@/features/interview/model/interview-session-storage";
 import { getApiClient } from "@/shared/api/client";
 
@@ -25,11 +29,19 @@ export function InterviewEnvironmentSetup({
   const router = useRouter();
   const { status } = useAuth();
   const apiRef = useRef<InterviewApi | null>(api ?? null);
+  const microphoneSessionRef = useRef<MicrophoneTestSession | null>(null);
+  const mountedRef = useRef(true);
   const [microphoneState, setMicrophoneState] =
     useState<MicrophoneTestState>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPlaybackReady, setIsPlaybackReady] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isStartingRecording, setIsStartingRecording] = useState(false);
+  const [isStoppingRecording, setIsStoppingRecording] = useState(false);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(
+    null,
+  );
+  const [recordingDurationMs, setRecordingDurationMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const resolveApi = useCallback(() => {
@@ -44,6 +56,15 @@ export function InterviewEnvironmentSetup({
   }, [router, status]);
 
   useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      microphoneSessionRef.current?.cancel();
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
@@ -51,20 +72,99 @@ export function InterviewEnvironmentSetup({
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    if (microphoneState !== "recording" || recordingStartedAt === null) {
+      return;
+    }
+
+    const updateDuration = () => {
+      setRecordingDurationMs(
+        Math.min(
+          MICROPHONE_TEST_DURATION_MS,
+          Math.max(0, Date.now() - recordingStartedAt),
+        ),
+      );
+    };
+
+    updateDuration();
+    const timer = window.setInterval(updateDuration, 1000);
+    return () => window.clearInterval(timer);
+  }, [microphoneState, recordingStartedAt]);
+
   async function handleMicrophoneTest() {
+    microphoneSessionRef.current?.cancel();
+    microphoneSessionRef.current = null;
     setError(null);
     setPreviewUrl(null);
     setIsPlaybackReady(false);
+    setIsStartingRecording(true);
+    setIsStoppingRecording(false);
+    setRecordingStartedAt(null);
+    setRecordingDurationMs(0);
     setMicrophoneState("recording");
 
     try {
-      const result = await testMicrophoneEnvironment();
-      setPreviewUrl(URL.createObjectURL(result.blob));
-      setMicrophoneState("recorded");
+      const session = await startMicrophoneEnvironmentTest();
+      if (!mountedRef.current) {
+        session.cancel();
+        return;
+      }
+
+      microphoneSessionRef.current = session;
+      setIsStartingRecording(false);
+      setRecordingStartedAt(Date.now());
+
+      void session.result.then(
+        (result) => {
+          if (
+            !mountedRef.current ||
+            microphoneSessionRef.current !== session
+          ) {
+            return;
+          }
+
+          microphoneSessionRef.current = null;
+          setIsStoppingRecording(false);
+          setRecordingStartedAt(null);
+          setRecordingDurationMs(result.durationMs);
+          setPreviewUrl(URL.createObjectURL(result.blob));
+          setMicrophoneState("recorded");
+        },
+        (cause) => {
+          if (
+            !mountedRef.current ||
+            microphoneSessionRef.current !== session
+          ) {
+            return;
+          }
+
+          microphoneSessionRef.current = null;
+          setIsStoppingRecording(false);
+          setRecordingStartedAt(null);
+          setMicrophoneState("idle");
+          setError(getInterviewErrorMessage(cause));
+        },
+      );
     } catch (cause) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setIsStartingRecording(false);
+      microphoneSessionRef.current = null;
       setMicrophoneState("idle");
       setError(getInterviewErrorMessage(cause));
     }
+  }
+
+  function handleStopMicrophoneTest() {
+    const session = microphoneSessionRef.current;
+    if (!session) {
+      return;
+    }
+
+    setIsStoppingRecording(true);
+    void session.stop().catch(() => undefined);
   }
 
   function handlePlaybackReady() {
@@ -143,9 +243,33 @@ export function InterviewEnvironmentSetup({
 
         <div className="mt-8 rounded-2xl bg-slate-50 p-5 text-center">
           {microphoneState === "recording" ? (
-            <p role="status" className="font-semibold text-blue-700">
-              녹음 중입니다. 잠시만 기다려 주세요.
-            </p>
+            <div role="status" className="space-y-4 text-slate-700">
+              {isStartingRecording ? (
+                <p className="font-semibold text-slate-600">
+                  마이크 권한과 녹음 환경을 확인하고 있습니다.
+                </p>
+              ) : (
+                <>
+                  <p className="font-semibold text-slate-600">
+                    아래 문장을 읽은 뒤 녹음 끝내기를 눌러 주세요.
+                  </p>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      음성 확인 문장
+                    </p>
+                    <p className="mt-2 text-base font-semibold leading-7 text-slate-900">
+                      안녕하세요. 음성 환경 테스트를 진행하고 있습니다.
+                    </p>
+                  </div>
+                  <p className="font-semibold text-slate-600">
+                    녹음 시간{" "}
+                    <span className="font-mono tabular-nums text-slate-900">
+                      {formatRecordingDuration(recordingDurationMs)}
+                    </span>
+                  </p>
+                </>
+              )}
+            </div>
           ) : null}
 
           {hasRecording && previewUrl ? (
@@ -168,6 +292,9 @@ export function InterviewEnvironmentSetup({
                 onError={handlePlaybackError}
                 className="mx-auto w-full max-w-md"
               />
+              <p className="text-sm font-semibold text-slate-600">
+                녹음 시간 {formatRecordingDuration(recordingDurationMs)}
+              </p>
               <label className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-700">
                 <input
                   type="checkbox"
@@ -182,15 +309,25 @@ export function InterviewEnvironmentSetup({
             </div>
           ) : null}
 
-          {microphoneState !== "recording" ? (
+          {microphoneState === "recording" ? (
+            <button
+              type="button"
+              onClick={handleStopMicrophoneTest}
+              disabled={isStartingRecording || isStoppingRecording}
+              className="h-12 w-full max-w-md rounded-xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isStoppingRecording ? "녹음 종료 중..." : "녹음 끝내기"}
+            </button>
+          ) : (
             <button
               type="button"
               onClick={() => void handleMicrophoneTest()}
+              disabled={isStartingRecording || isStoppingRecording}
               className="h-12 w-full max-w-md rounded-xl border border-blue-200 bg-white px-5 text-sm font-bold text-blue-700 transition hover:border-blue-500 hover:bg-blue-50"
             >
               {hasRecording ? "다시 테스트하기" : "마이크 테스트 시작"}
             </button>
-          ) : null}
+          )}
         </div>
 
         {error ? (
@@ -211,7 +348,7 @@ export function InterviewEnvironmentSetup({
           <button
             type="button"
             onClick={() => router.push("/interviews")}
-            disabled={isStarting}
+            disabled={isStarting || isStartingRecording || isStoppingRecording}
             className="h-12 flex-1 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             돌아가기
@@ -228,4 +365,12 @@ function CheckItem({ label }: { label: string }) {
       {label}
     </div>
   );
+}
+
+function formatRecordingDuration(durationMs: number) {
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }

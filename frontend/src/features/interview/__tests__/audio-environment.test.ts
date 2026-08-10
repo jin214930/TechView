@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   AudioEnvironmentError,
+  startMicrophoneEnvironmentTest,
   testMicrophoneEnvironment,
 } from "@/features/interview/model/audio-environment";
 
@@ -61,6 +62,32 @@ describe("testMicrophoneEnvironment", () => {
     expect(result.blob.type).toBe("audio/webm");
     expect(result.blob.size).toBeGreaterThan(0);
     expect(result.durationMs).toBeGreaterThan(0);
+    expect(stopTrack).toHaveBeenCalledOnce();
+  });
+
+  it("can be stopped manually before the maximum duration", async () => {
+    vi.useFakeTimers();
+    const stopTrack = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop: stopTrack }],
+    } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+
+    vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+
+    const session = await startMicrophoneEnvironmentTest(60_000);
+    await vi.advanceTimersByTimeAsync(1500);
+    const result = await session.stop();
+
+    expect(result.blob.type).toBe("audio/webm");
+    expect(result.durationMs).toBeGreaterThan(0);
+    expect(stopTrack).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(stopTrack).toHaveBeenCalledOnce();
   });
 
