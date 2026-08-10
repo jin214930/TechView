@@ -5,11 +5,13 @@ import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.dto.ActiveInterviewResponse;
 import com.ward.techview.interview.dto.InterviewStartResponse;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
+import com.ward.techview.interview.entity.InterviewDailyUsage;
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.entity.InterviewStatus;
 import com.ward.techview.interview.entity.InterviewTurn;
 import com.ward.techview.interview.entity.InterviewTurnType;
 import com.ward.techview.interview.repository.InterviewCoreQuestionRepository;
+import com.ward.techview.interview.repository.InterviewDailyUsageRepository;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
 import com.ward.techview.interview.response.InterviewResponseCode;
@@ -29,6 +31,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.OffsetDateTime;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -58,6 +61,9 @@ class InterviewServiceTest {
 
     @Mock
     private InterviewSessionRepository interviewSessionRepository;
+
+    @Mock
+    private InterviewDailyUsageRepository interviewDailyUsageRepository;
 
     @Mock
     private InterviewCoreQuestionRepository interviewCoreQuestionRepository;
@@ -160,6 +166,8 @@ class InterviewServiceTest {
                 any(OffsetDateTime.class)
         );
         verify(questionSelector, never()).selectCoreQuestions();
+        verify(interviewDailyUsageRepository, never()).existsByMemberIdAndUsageDate(any(), any());
+        verify(interviewDailyUsageRepository, never()).save(any(InterviewDailyUsage.class));
         verify(interviewCoreQuestionRepository, never()).saveAll(any());
     }
 
@@ -197,6 +205,11 @@ class InterviewServiceTest {
         );
         verify(memberLockManager).lock(MEMBER_ID);
         verify(questionSelector).selectCoreQuestions();
+        verify(interviewDailyUsageRepository).existsByMemberIdAndUsageDate(
+                MEMBER_ID,
+                LocalDate.of(2026, 8, 10)
+        );
+        verify(interviewDailyUsageRepository).save(any(InterviewDailyUsage.class));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<InterviewCoreQuestion>> questionsCaptor = ArgumentCaptor.forClass(List.class);
@@ -258,17 +271,16 @@ class InterviewServiceTest {
     }
 
     @Test
-    @DisplayName("?ㅼ씪 硫댁젒???덉쑝硫??덈줈???몄뀡???앹꽦?섏? ?딅뒗??")
+    @DisplayName("오늘 이미 면접을 시작했으면 새 세션을 생성하지 않는다")
     void shouldRejectNewSessionWhenMemberAlreadyStartedInterviewToday() {
         when(interviewSessionRepository.findActiveSession(
                 eq(MEMBER_ID),
                 eq(InterviewStatus.IN_PROGRESS),
                 any(OffsetDateTime.class)
         )).thenReturn(Optional.empty());
-        when(interviewSessionRepository.existsByMemberIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
-                eq(MEMBER_ID),
-                any(OffsetDateTime.class),
-                any(OffsetDateTime.class)
+        when(interviewDailyUsageRepository.existsByMemberIdAndUsageDate(
+                MEMBER_ID,
+                LocalDate.of(2026, 8, 10)
         )).thenReturn(true);
 
         BusinessException exception = assertThrows(
@@ -279,11 +291,11 @@ class InterviewServiceTest {
         assertSame(InterviewResponseCode.DAILY_INTERVIEW_LIMIT_EXCEEDED, exception.getResponseCode());
         verify(questionSelector, never()).selectCoreQuestions();
         verify(interviewSessionRepository, never()).save(any());
-        verify(interviewSessionRepository).existsByMemberIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+        verify(interviewDailyUsageRepository).existsByMemberIdAndUsageDate(
                 MEMBER_ID,
-                OffsetDateTime.parse("2026-08-09T15:00:00Z"),
-                OffsetDateTime.parse("2026-08-10T15:00:00Z")
+                LocalDate.of(2026, 8, 10)
         );
+        verify(interviewDailyUsageRepository, never()).save(any(InterviewDailyUsage.class));
     }
 
     private void verifyThirtyDayCutoff() {

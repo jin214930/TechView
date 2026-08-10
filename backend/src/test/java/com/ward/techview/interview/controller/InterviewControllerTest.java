@@ -214,7 +214,7 @@ class InterviewControllerTest {
     }
 
     @Test
-    @DisplayName("returns 429 when daily interview limit is exceeded")
+    @DisplayName("일일 면접 횟수 제한을 초과하면 HTTP 429를 반환한다")
     void shouldReturnTooManyRequestsWhenDailyInterviewLimitIsExceeded() throws Exception {
         when(interviewService.startOrResume(MEMBER_ID))
                 .thenThrow(new BusinessException(InterviewResponseCode.DAILY_INTERVIEW_LIMIT_EXCEEDED));

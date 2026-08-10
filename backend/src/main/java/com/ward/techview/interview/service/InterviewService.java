@@ -5,10 +5,12 @@ import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.dto.ActiveInterviewResponse;
 import com.ward.techview.interview.dto.InterviewStartResponse;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
+import com.ward.techview.interview.entity.InterviewDailyUsage;
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.entity.InterviewStatus;
 import com.ward.techview.interview.entity.InterviewTurn;
 import com.ward.techview.interview.repository.InterviewCoreQuestionRepository;
+import com.ward.techview.interview.repository.InterviewDailyUsageRepository;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
 import com.ward.techview.interview.response.InterviewResponseCode;
@@ -22,7 +24,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -33,6 +34,7 @@ public class InterviewService {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final InterviewSessionRepository interviewSessionRepository;
+    private final InterviewDailyUsageRepository interviewDailyUsageRepository;
     private final InterviewCoreQuestionRepository interviewCoreQuestionRepository;
     private final InterviewTurnRepository interviewTurnRepository;
     private final MemberLockManager memberLockManager;
@@ -60,27 +62,19 @@ public class InterviewService {
         return interviewSessionRepository.findActiveSession(memberId, InterviewStatus.IN_PROGRESS, cutoff)
                 .map(this::resume)
                 .orElseGet(() -> {
-                    validateDailyLimit(memberId, now);
+                    consumeDailyUsage(memberId, now);
                     return create(memberId, now);
                 });
     }
 
-    private void validateDailyLimit(Long memberId, OffsetDateTime now) {
-        LocalDate today = now.atZoneSameInstant(BUSINESS_ZONE).toLocalDate();
-        OffsetDateTime startOfDay = today.atStartOfDay(BUSINESS_ZONE)
-                .toOffsetDateTime()
-                .withOffsetSameInstant(ZoneOffset.UTC);
-        OffsetDateTime startOfNextDay = today.plusDays(1).atStartOfDay(BUSINESS_ZONE)
-                .toOffsetDateTime()
-                .withOffsetSameInstant(ZoneOffset.UTC);
+    private void consumeDailyUsage(Long memberId, OffsetDateTime now) {
+        LocalDate usageDate = now.atZoneSameInstant(BUSINESS_ZONE).toLocalDate();
 
-        if (interviewSessionRepository.existsByMemberIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
-                memberId,
-                startOfDay,
-                startOfNextDay
-        )) {
+        if (interviewDailyUsageRepository.existsByMemberIdAndUsageDate(memberId, usageDate)) {
             throw new BusinessException(InterviewResponseCode.DAILY_INTERVIEW_LIMIT_EXCEEDED);
         }
+
+        interviewDailyUsageRepository.save(InterviewDailyUsage.create(memberId, usageDate));
     }
 
     private InterviewStartResponse resume(InterviewSession session) {

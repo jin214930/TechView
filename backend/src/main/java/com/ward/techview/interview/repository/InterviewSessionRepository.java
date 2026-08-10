@@ -43,12 +43,6 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
 
     Optional<InterviewSession> findByIdAndMemberId(Long sessionId, Long memberId);
 
-    boolean existsByMemberIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
-            Long memberId,
-            OffsetDateTime startOfDay,
-            OffsetDateTime startOfNextDay
-    );
-
     Page<InterviewSession> findAllByMemberIdAndStatus(Long memberId, InterviewStatus status, Pageable pageable);
 
     @Query(
