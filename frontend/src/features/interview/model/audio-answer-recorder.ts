@@ -1,6 +1,9 @@
 import {
   AudioEnvironmentError,
+  getRetainedMicrophoneStream,
   getSupportedWebmMimeType,
+  MicrophoneSetupRequiredError,
+  releaseRetainedMicrophoneStream,
 } from "@/features/interview/model/audio-environment";
 
 export const MAX_AUDIO_DURATION_MS = 180_000;
@@ -12,6 +15,7 @@ export interface AudioAnswerRecording {
 }
 
 export interface AudioAnswerRecordingSession {
+  result: Promise<AudioAnswerRecording>;
   stop(): Promise<AudioAnswerRecording>;
   cancel(): void;
 }
@@ -32,13 +36,18 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
     );
   }
 
-  const stream = await navigator.mediaDevices
-    .getUserMedia({ audio: true })
-    .catch(() => {
-      throw new AudioEnvironmentError(
-        "마이크 권한을 허용해야 면접을 진행할 수 있습니다.",
-      );
-    });
+  const stream = getRetainedMicrophoneStream();
+  if (!stream) {
+    throw new MicrophoneSetupRequiredError();
+  }
+
+  let tracksStopped = false;
+  const stopTracks = () => {
+    if (tracksStopped) {
+      return;
+    }
+    tracksStopped = true;
+  };
 
   try {
     const recorder = new MediaRecorder(stream, { mimeType });
@@ -46,17 +55,13 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
     const startedAt = performance.now();
     let settled = false;
     let stopTimer: number | undefined;
-    let resolveStop!: (recording: AudioAnswerRecording) => void;
-    let rejectStop!: (error: Error) => void;
+    let resolveResult!: (recording: AudioAnswerRecording) => void;
+    let rejectResult!: (error: Error) => void;
 
-    const stopPromise = new Promise<AudioAnswerRecording>((resolve, reject) => {
-      resolveStop = resolve;
-      rejectStop = reject;
+    const result = new Promise<AudioAnswerRecording>((resolve, reject) => {
+      resolveResult = resolve;
+      rejectResult = reject;
     });
-
-    const stopTracks = () => {
-      stream.getTracks().forEach((track) => track.stop());
-    };
 
     const clearStopTimer = () => {
       if (stopTimer !== undefined) {
@@ -77,7 +82,8 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
       settled = true;
       clearStopTimer();
       stopTracks();
-      rejectStop(new AudioEnvironmentError("음성 녹음 중 오류가 발생했습니다."));
+      releaseRetainedMicrophoneStream();
+      rejectResult(new AudioEnvironmentError("음성 녹음 중 오류가 발생했습니다."));
     };
 
     recorder.onstop = () => {
@@ -90,11 +96,12 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
 
       const blob = new Blob(chunks, { type: "audio/webm" });
       if (blob.size === 0) {
-        rejectStop(new AudioEnvironmentError("녹음된 음성을 확인할 수 없습니다."));
+        releaseRetainedMicrophoneStream();
+        rejectResult(new AudioEnvironmentError("녹음된 음성을 확인할 수 없습니다."));
         return;
       }
 
-      resolveStop({
+      resolveResult({
         blob,
         contentType: "audio/webm",
         durationMs: Math.min(
@@ -117,11 +124,12 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
     }
 
     return {
+      result,
       stop() {
         if (!settled && recorder.state === "recording") {
           recorder.stop();
         }
-        return stopPromise;
+        return result;
       },
       cancel() {
         if (settled) {
@@ -136,7 +144,8 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
       },
     };
   } catch (cause) {
-    stream.getTracks().forEach((track) => track.stop());
+    stopTracks();
+    releaseRetainedMicrophoneStream();
     if (cause instanceof AudioEnvironmentError) {
       throw cause;
     }

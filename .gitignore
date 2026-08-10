@@ -1,2 +1,5 @@
 # Local-only design working documents
 /docs/
+
+# Local editor settings
+.vscode/

@@ -15,7 +15,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: minio-container
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -34,13 +34,10 @@ services:
     depends_on:
       - minio
     entrypoint: >-
-      /bin/sh -c '
-      until mc alias set local http://minio:9000 minioadmin minioadmin; do
+      /bin/sh -c ' until mc alias set local http://minio:9000 minioadmin minioadmin; do
         echo "Waiting for MinIO...";
         sleep 2;
-      done;
-      mc mb --ignore-existing local/techview-audio;
-      '
+      done; mc mb --ignore-existing local/techview-audio; '
     restart: "no"
 
 volumes:

@@ -4,6 +4,11 @@ import {
   MAX_AUDIO_DURATION_MS,
   startAudioAnswerRecording,
 } from "@/features/interview/model/audio-answer-recorder";
+import {
+  MicrophoneSetupRequiredError,
+  releaseRetainedMicrophoneStream,
+  startMicrophoneEnvironmentTest,
+} from "@/features/interview/model/audio-environment";
 
 class FakeMediaRecorder {
   static isTypeSupported = vi.fn().mockReturnValue(true);
@@ -34,16 +39,23 @@ class FakeMediaRecorder {
   }
 }
 
+async function prepareRetainedStream() {
+  const microphoneTest = await startMicrophoneEnvironmentTest();
+  microphoneTest.retainStream();
+  await microphoneTest.stop();
+}
+
 describe("startAudioAnswerRecording", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     Reflect.deleteProperty(navigator, "mediaDevices");
+    releaseRetainedMicrophoneStream();
     FakeMediaRecorder.isTypeSupported.mockReturnValue(true);
     FakeMediaRecorder.lastInstance = null;
     vi.useRealTimers();
   });
 
-  it("returns a WebM recording and releases microphone tracks on stop", async () => {
+  it("returns a WebM recording without releasing the shared microphone stream", async () => {
     const stopTrack = vi.fn();
     const stream = {
       getTracks: () => [{ stop: stopTrack }],
@@ -56,6 +68,7 @@ describe("startAudioAnswerRecording", () => {
       value: { getUserMedia },
     });
 
+    await prepareRetainedStream();
     const session = await startAudioAnswerRecording();
     const result = await session.stop();
 
@@ -64,7 +77,21 @@ describe("startAudioAnswerRecording", () => {
     expect(result.blob.type).toBe("audio/webm");
     expect(result.blob.size).toBeGreaterThan(0);
     expect(result.durationMs).toBeGreaterThan(0);
-    expect(stopTrack).toHaveBeenCalledOnce();
+    expect(stopTrack).not.toHaveBeenCalled();
+  });
+
+  it("does not request microphone permission again without the environment test", async () => {
+    const getUserMedia = vi.fn();
+    vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+
+    await expect(startAudioAnswerRecording()).rejects.toBeInstanceOf(
+      MicrophoneSetupRequiredError,
+    );
+    expect(getUserMedia).not.toHaveBeenCalled();
   });
 
   it("automatically stops at the server audio duration limit", async () => {
@@ -81,12 +108,37 @@ describe("startAudioAnswerRecording", () => {
       value: { getUserMedia },
     });
 
+    await prepareRetainedStream();
     const session = await startAudioAnswerRecording();
     await vi.advanceTimersByTimeAsync(MAX_AUDIO_DURATION_MS);
 
     expect(FakeMediaRecorder.lastInstance?.state).toBe("inactive");
-    const result = await session.stop();
+    const result = await session.result;
     expect(result.contentType).toBe("audio/webm");
-    expect(stopTrack).toHaveBeenCalledOnce();
+    expect(stopTrack).not.toHaveBeenCalled();
+  });
+
+  it("reuses the microphone stream granted during the environment test", async () => {
+    const stopTrack = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop: stopTrack, readyState: "live" }],
+    } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+
+    vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+
+    const microphoneTest = await startMicrophoneEnvironmentTest();
+    microphoneTest.retainStream();
+    await microphoneTest.stop();
+
+    const answerSession = await startAudioAnswerRecording();
+    await answerSession.stop();
+
+    expect(getUserMedia).toHaveBeenCalledOnce();
+    expect(stopTrack).not.toHaveBeenCalled();
   });
 });

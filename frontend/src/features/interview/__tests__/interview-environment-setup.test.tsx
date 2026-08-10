@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthApi } from "@/features/auth/api/auth-api";
@@ -9,11 +16,11 @@ import {
 } from "@/features/interview/model/audio-environment";
 import { InterviewEnvironmentSetup } from "@/features/interview/ui/interview-environment-setup";
 
-const { replaceMock, pushMock, testMicrophoneEnvironmentMock } = vi.hoisted(
+const { replaceMock, pushMock, startMicrophoneEnvironmentTestMock } = vi.hoisted(
   () => ({
     replaceMock: vi.fn(),
     pushMock: vi.fn(),
-    testMicrophoneEnvironmentMock: vi.fn(),
+    startMicrophoneEnvironmentTestMock: vi.fn(),
   }),
 );
 
@@ -27,7 +34,7 @@ vi.mock("@/features/interview/model/audio-environment", async () => {
   >("@/features/interview/model/audio-environment");
   return {
     ...actual,
-    testMicrophoneEnvironment: testMicrophoneEnvironmentMock,
+    startMicrophoneEnvironmentTest: startMicrophoneEnvironmentTestMock,
   };
 });
 
@@ -77,13 +84,34 @@ function renderSetup(
   );
 }
 
+function createPendingMicrophoneTestSession() {
+  let resolveResult!: (result: {
+    blob: Blob;
+    durationMs: number;
+  }) => void;
+  const result = new Promise<{ blob: Blob; durationMs: number }>((resolve) => {
+    resolveResult = resolve;
+  });
+
+  return {
+    session: {
+      result,
+      stop: vi.fn(() => result),
+      cancel: vi.fn(),
+      retainStream: vi.fn(),
+    },
+    resolveResult,
+  };
+}
+
 describe("InterviewEnvironmentSetup", () => {
   afterEach(() => {
     cleanup();
     window.sessionStorage.clear();
     replaceMock.mockReset();
     pushMock.mockReset();
-    testMicrophoneEnvironmentMock.mockReset();
+    startMicrophoneEnvironmentTestMock.mockReset();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -105,10 +133,9 @@ describe("InterviewEnvironmentSetup", () => {
 
   it("requires playback confirmation before starting or resuming", async () => {
     const api = createInterviewApi();
-    testMicrophoneEnvironmentMock.mockResolvedValue({
-      blob: new Blob(["test audio"], { type: "audio/webm" }),
-      durationMs: 1000,
-    });
+    const { session: recordingSession, resolveResult } =
+      createPendingMicrophoneTestSession();
+    startMicrophoneEnvironmentTestMock.mockResolvedValue(recordingSession);
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test-audio");
 
     renderSetup(api);
@@ -119,6 +146,17 @@ describe("InterviewEnvironmentSetup", () => {
     expect((startButton as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "마이크 테스트 시작" }));
+    expect(
+      await screen.findByText("아래 문장을 읽은 뒤 녹음 끝내기를 눌러 주세요."),
+    ).toBeTruthy();
+    expect(screen.getByText("음성 확인 문장")).toBeTruthy();
+    expect(screen.getByText("00:00")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "녹음 끝내기" }));
+    expect(recordingSession.stop).toHaveBeenCalledOnce();
+    resolveResult({
+      blob: new Blob(["test audio"], { type: "audio/webm" }),
+      durationMs: 1000,
+    });
     expect(
       await screen.findByText("녹음된 음성을 재생하고 소리를 확인해 주세요."),
     ).toBeTruthy();
@@ -149,7 +187,7 @@ describe("InterviewEnvironmentSetup", () => {
 
   it("blocks the interview when microphone permission is denied", async () => {
     const api = createInterviewApi();
-    testMicrophoneEnvironmentMock.mockRejectedValue(
+    startMicrophoneEnvironmentTestMock.mockRejectedValue(
       new AudioEnvironmentError(
         "마이크 권한을 허용해야 면접을 진행할 수 있습니다.",
       ),
@@ -167,5 +205,67 @@ describe("InterviewEnvironmentSetup", () => {
         .disabled,
     ).toBe(true);
     expect(api.startOrResume).not.toHaveBeenCalled();
+  });
+
+  it("can cancel the initial microphone permission request and retry", async () => {
+    let resolveSession!: (session: { cancel: () => void }) => void;
+    startMicrophoneEnvironmentTestMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+
+    renderSetup(createInterviewApi());
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "마이크 테스트 시작" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "마이크 테스트 취소" }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "마이크 테스트 취소" }));
+
+    expect(
+      await screen.findByRole("button", { name: "마이크 테스트 시작" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain(
+      "다시 시도해 주세요.",
+    );
+
+    const cancel = vi.fn();
+    resolveSession({ cancel });
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  });
+
+  it("shows elapsed recording time while the microphone test is active", async () => {
+    const { session, resolveResult } = createPendingMicrophoneTestSession();
+    startMicrophoneEnvironmentTestMock.mockResolvedValue(session);
+
+    renderSetup(createInterviewApi());
+    const startButton = await screen.findByRole("button", {
+      name: "마이크 테스트 시작",
+    });
+    vi.useFakeTimers();
+
+    fireEvent.click(startButton);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText("00:00")).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getByText("00:01")).toBeTruthy();
+
+    await act(async () => {
+      resolveResult({
+        blob: new Blob(["test audio"], { type: "audio/webm" }),
+        durationMs: 1000,
+      });
+      await Promise.resolve();
+    });
+    expect(screen.getByText("녹음된 음성을 재생하고 소리를 확인해 주세요.")).toBeTruthy();
   });
 });
