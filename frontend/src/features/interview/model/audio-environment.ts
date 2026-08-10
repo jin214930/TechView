@@ -19,6 +19,13 @@ export class AudioEnvironmentError extends Error {
   }
 }
 
+export class MicrophoneSetupRequiredError extends AudioEnvironmentError {
+  constructor() {
+    super("면접 환경 테스트를 먼저 완료한 후 답변을 녹음해 주세요.");
+    this.name = "MicrophoneSetupRequiredError";
+  }
+}
+
 let retainedMicrophoneStream: MediaStream | null = null;
 
 function stopStream(stream: MediaStream) {

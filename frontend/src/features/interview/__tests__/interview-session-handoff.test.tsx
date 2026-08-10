@@ -294,6 +294,7 @@ describe("InterviewSessionHandoff", () => {
         name: "면접 피드백을 생성 중입니다.",
       }),
     ).toBeTruthy();
+    expect(releaseRetainedMicrophoneStreamMock).toHaveBeenCalled();
     expect(
       screen.getByRole("link", { name: "면접 종료" }).getAttribute("href"),
     ).toBe("/");
@@ -328,6 +329,7 @@ describe("InterviewSessionHandoff", () => {
 
     renderHandoff(api, createAuthApi(), eventsApi, feedbackApi);
     await screen.findByText("면접 피드백을 생성 중입니다.");
+    await waitFor(() => expect(eventsApi.subscribe).toHaveBeenCalled());
 
     onEvent({ name: "connected", sessionId: 10 });
 
@@ -365,6 +367,26 @@ describe("InterviewSessionHandoff", () => {
     expect(
       screen.getByRole("link", { name: "면접 종료" }).getAttribute("href"),
     ).toBe("/");
+  });
+
+  it("releases the microphone when interview progress fails", async () => {
+    const api = createInterviewApi({
+      getProgress: vi.fn().mockResolvedValue({
+        sessionId: 10,
+        status: "FAILED",
+        turnId: null,
+        turnOrder: null,
+        turnType: null,
+        question: null,
+        errorCode: "INTERVIEW_FAILED",
+        errorMessage: "면접 처리에 실패했습니다.",
+      }),
+    });
+
+    renderHandoff(api);
+
+    expect(await screen.findByText("면접 처리에 실패했습니다.")).toBeTruthy();
+    expect(releaseRetainedMicrophoneStreamMock).toHaveBeenCalled();
   });
 
   it("serializes overlapping progress refreshes and replays the latest event", async () => {

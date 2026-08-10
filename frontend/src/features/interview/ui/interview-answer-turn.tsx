@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -13,6 +14,7 @@ import {
   type AudioAnswerRecordingSession,
 } from "@/features/interview/model/audio-answer-recorder";
 import { getInterviewErrorMessage } from "@/features/interview/model/interview-error";
+import { MicrophoneSetupRequiredError } from "@/features/interview/model/audio-environment";
 import type { InterviewProgress } from "@/features/interview/model/interview-types";
 import { getApiClient } from "@/shared/api/client";
 
@@ -51,6 +53,7 @@ export function InterviewAnswerTurn({
   const [isStoppingRecording, setIsStoppingRecording] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
   const [recordingDurationMs, setRecordingDurationMs] = useState(0);
+  const [requiresEnvironmentSetup, setRequiresEnvironmentSetup] = useState(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -139,6 +142,7 @@ export function InterviewAnswerTurn({
     recorderRef.current?.cancel();
     recorderRef.current = null;
     setError(null);
+    setRequiresEnvironmentSetup(false);
     setRecording(null);
     replacePreviewUrl(null);
     setIsStartingRecording(true);
@@ -167,6 +171,7 @@ export function InterviewAnswerTurn({
       setRecordingStartedAt(null);
       setRecordingDurationMs(0);
       setAnswerState("idle");
+      setRequiresEnvironmentSetup(cause instanceof MicrophoneSetupRequiredError);
       setError(getInterviewErrorMessage(cause));
     }
   }
@@ -321,9 +326,19 @@ export function InterviewAnswerTurn({
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-5 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </p>
+        <div className="mt-5 space-y-3">
+          <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </p>
+          {requiresEnvironmentSetup ? (
+            <Link
+              href="/interviews/setup"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-blue-200 px-4 text-sm font-bold text-blue-700 transition hover:border-blue-500 hover:bg-blue-50"
+            >
+              음성 환경 다시 확인하기
+            </Link>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row">

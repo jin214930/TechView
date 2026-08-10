@@ -58,6 +58,7 @@ export function InterviewSessionHandoff({
   const feedbackRefreshRef = useRef<Promise<void> | null>(null);
   const feedbackRefreshQueuedRef = useRef(false);
   const feedbackLoadStartedRef = useRef(false);
+  const terminalMicrophoneReleasedRef = useRef(false);
   const microphoneReleaseTimerRef = useRef<number | null>(null);
   const refreshProgressHandlerRef = useRef<(showLoading?: boolean) => void>(
     () => undefined,
@@ -268,6 +269,18 @@ export function InterviewSessionHandoff({
     feedbackLoadStartedRef.current = true;
     refreshFeedback(true);
   }, [progress?.status, refreshFeedback, status]);
+
+  useEffect(() => {
+    if (
+      terminalMicrophoneReleasedRef.current ||
+      (progress?.status !== "COMPLETED" && progress?.status !== "FAILED")
+    ) {
+      return;
+    }
+
+    terminalMicrophoneReleasedRef.current = true;
+    releaseRetainedMicrophoneStream();
+  }, [progress?.status]);
 
   useEffect(() => {
     if (status !== "authenticated" || isLoading || error) {

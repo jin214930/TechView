@@ -2,6 +2,7 @@ import {
   AudioEnvironmentError,
   getRetainedMicrophoneStream,
   getSupportedWebmMimeType,
+  MicrophoneSetupRequiredError,
   releaseRetainedMicrophoneStream,
 } from "@/features/interview/model/audio-environment";
 
@@ -37,9 +38,7 @@ export async function startAudioAnswerRecording(): Promise<AudioAnswerRecordingS
 
   const stream = getRetainedMicrophoneStream();
   if (!stream) {
-    throw new AudioEnvironmentError(
-      "면접 환경 테스트를 먼저 완료한 후 답변을 녹음해 주세요.",
-    );
+    throw new MicrophoneSetupRequiredError();
   }
 
   let tracksStopped = false;

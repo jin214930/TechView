@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InterviewAnswerTurn } from "@/features/interview/ui/interview-answer-turn";
+import { MicrophoneSetupRequiredError } from "@/features/interview/model/audio-environment";
 
 const { startRecordingMock } = vi.hoisted(() => ({
   startRecordingMock: vi.fn(),
@@ -205,6 +206,20 @@ describe("InterviewAnswerTurn", () => {
       expect(getButton(0).textContent).toContain("녹음 끝내기"),
     );
     expect(recordingSession.cancel).not.toHaveBeenCalled();
+  });
+
+  it("offers the environment test again when the retained stream is missing", async () => {
+    startRecordingMock.mockRejectedValue(new MicrophoneSetupRequiredError());
+
+    render(<InterviewAnswerTurn progress={progress} voiceApi={createVoiceApi()} />);
+
+    fireEvent.click(getButton(0));
+
+    expect(
+      (await screen.findByRole("link", {
+        name: "음성 환경 다시 확인하기",
+      })).getAttribute("href"),
+    ).toBe("/interviews/setup");
   });
 
   it("can cancel a recording start that is waiting for microphone permission", async () => {

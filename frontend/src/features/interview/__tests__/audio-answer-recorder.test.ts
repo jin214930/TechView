@@ -5,7 +5,7 @@ import {
   startAudioAnswerRecording,
 } from "@/features/interview/model/audio-answer-recorder";
 import {
-  AudioEnvironmentError,
+  MicrophoneSetupRequiredError,
   releaseRetainedMicrophoneStream,
   startMicrophoneEnvironmentTest,
 } from "@/features/interview/model/audio-environment";
@@ -88,10 +88,8 @@ describe("startAudioAnswerRecording", () => {
       value: { getUserMedia },
     });
 
-    await expect(startAudioAnswerRecording()).rejects.toEqual(
-      new AudioEnvironmentError(
-        "면접 환경 테스트를 먼저 완료한 후 답변을 녹음해 주세요.",
-      ),
+    await expect(startAudioAnswerRecording()).rejects.toBeInstanceOf(
+      MicrophoneSetupRequiredError,
     );
     expect(getUserMedia).not.toHaveBeenCalled();
   });
