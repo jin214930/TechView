@@ -16,6 +16,7 @@ import {
   type InterviewEventsApi,
 } from "@/features/interview/api/interview-events-api";
 import { getInterviewErrorMessage } from "@/features/interview/model/interview-error";
+import { releaseRetainedMicrophoneStream } from "@/features/interview/model/audio-environment";
 import { clearInterviewStart } from "@/features/interview/model/interview-session-storage";
 import type { InterviewProgress } from "@/features/interview/model/interview-types";
 import { getApiClient } from "@/shared/api/client";
@@ -42,6 +43,7 @@ export function InterviewSessionHandoff({
   const progressRef = useRef<InterviewProgress | null>(null);
   const progressRefreshRef = useRef<Promise<void> | null>(null);
   const progressRefreshQueuedRef = useRef(false);
+  const microphoneReleaseTimerRef = useRef<number | null>(null);
   const refreshProgressHandlerRef = useRef<(showLoading?: boolean) => void>(
     () => undefined,
   );
@@ -125,6 +127,20 @@ export function InterviewSessionHandoff({
       refreshProgressHandlerRef.current = () => undefined;
     };
   }, [refreshProgress]);
+
+  useEffect(() => {
+    if (microphoneReleaseTimerRef.current !== null) {
+      window.clearTimeout(microphoneReleaseTimerRef.current);
+      microphoneReleaseTimerRef.current = null;
+    }
+
+    return () => {
+      microphoneReleaseTimerRef.current = window.setTimeout(() => {
+        microphoneReleaseTimerRef.current = null;
+        releaseRetainedMicrophoneStream();
+      }, 0);
+    };
+  }, []);
 
   useEffect(() => {
     if (status === "loading") {

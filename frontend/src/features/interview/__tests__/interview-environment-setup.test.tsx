@@ -98,6 +98,7 @@ function createPendingMicrophoneTestSession() {
       result,
       stop: vi.fn(() => result),
       cancel: vi.fn(),
+      retainStream: vi.fn(),
     },
     resolveResult,
   };
@@ -204,6 +205,37 @@ describe("InterviewEnvironmentSetup", () => {
         .disabled,
     ).toBe(true);
     expect(api.startOrResume).not.toHaveBeenCalled();
+  });
+
+  it("can cancel the initial microphone permission request and retry", async () => {
+    let resolveSession!: (session: { cancel: () => void }) => void;
+    startMicrophoneEnvironmentTestMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+
+    renderSetup(createInterviewApi());
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "마이크 테스트 시작" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "마이크 테스트 취소" }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "마이크 테스트 취소" }));
+
+    expect(
+      await screen.findByRole("button", { name: "마이크 테스트 시작" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain(
+      "다시 시도해 주세요.",
+    );
+
+    const cancel = vi.fn();
+    resolveSession({ cancel });
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
   });
 
   it("shows elapsed recording time while the microphone test is active", async () => {

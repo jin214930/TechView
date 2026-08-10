@@ -9,6 +9,7 @@ export interface MicrophoneTestSession {
   result: Promise<MicrophoneTestResult>;
   stop(): Promise<MicrophoneTestResult>;
   cancel(): void;
+  retainStream(): void;
 }
 
 export class AudioEnvironmentError extends Error {
@@ -16,6 +17,57 @@ export class AudioEnvironmentError extends Error {
     super(message);
     this.name = "AudioEnvironmentError";
   }
+}
+
+let retainedMicrophoneStream: MediaStream | null = null;
+
+function stopStream(stream: MediaStream) {
+  stream.getTracks().forEach((track) => track.stop());
+}
+
+export function getRetainedMicrophoneStream(): MediaStream | null {
+  if (!retainedMicrophoneStream) {
+    return null;
+  }
+
+  if (
+    !retainedMicrophoneStream
+      .getTracks()
+      .some((track) => track.readyState !== "ended")
+  ) {
+    retainedMicrophoneStream = null;
+    return null;
+  }
+
+  return retainedMicrophoneStream;
+}
+
+export function releaseRetainedMicrophoneStream() {
+  if (!retainedMicrophoneStream) {
+    return;
+  }
+
+  const stream = retainedMicrophoneStream;
+  retainedMicrophoneStream = null;
+  stopStream(stream);
+}
+
+async function requestMicrophoneStream(): Promise<MediaStream> {
+  const permission = await navigator.permissions?.query({
+    name: "microphone" as PermissionName,
+  }).catch(() => null);
+
+  if (permission?.state === "denied") {
+    throw new AudioEnvironmentError(
+      "브라우저의 마이크 권한이 차단되어 있습니다. 주소창의 사이트 권한에서 마이크를 허용한 후 다시 시도해 주세요.",
+    );
+  }
+
+  return navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {
+    throw new AudioEnvironmentError(
+      "마이크 권한을 허용해야 면접을 진행할 수 있습니다.",
+    );
+  });
 }
 
 export async function startMicrophoneEnvironmentTest(
@@ -40,13 +92,7 @@ export async function startMicrophoneEnvironmentTest(
     );
   }
 
-  const stream = await navigator.mediaDevices
-    .getUserMedia({ audio: true })
-    .catch(() => {
-      throw new AudioEnvironmentError(
-        "마이크 권한을 허용해야 면접을 진행할 수 있습니다.",
-      );
-    });
+  const stream = await requestMicrophoneStream();
 
   try {
     const recorder = new MediaRecorder(stream, { mimeType });
@@ -54,6 +100,7 @@ export async function startMicrophoneEnvironmentTest(
     const startedAt = performance.now();
     let settled = false;
     let tracksStopped = false;
+    let shouldRetainStream = false;
     let stopTimer: number | undefined;
     let resolveResult!: (result: MicrophoneTestResult) => void;
     let rejectResult!: (error: Error) => void;
@@ -64,11 +111,18 @@ export async function startMicrophoneEnvironmentTest(
     });
 
     const stopTracks = () => {
+      if (shouldRetainStream) {
+        retainedMicrophoneStream = stream;
+        return;
+      }
       if (tracksStopped) {
         return;
       }
       tracksStopped = true;
-      stream.getTracks().forEach((track) => track.stop());
+      if (retainedMicrophoneStream === stream) {
+        retainedMicrophoneStream = null;
+      }
+      stopStream(stream);
     };
 
     const clearStopTimer = () => {
@@ -82,6 +136,7 @@ export async function startMicrophoneEnvironmentTest(
         return;
       }
       settled = true;
+      shouldRetainStream = false;
       clearStopTimer();
       stopTracks();
       rejectResult(error);
@@ -103,16 +158,18 @@ export async function startMicrophoneEnvironmentTest(
       }
       settled = true;
       clearStopTimer();
-      stopTracks();
 
       const blob = new Blob(chunks, {
         type: recorder.mimeType || mimeType,
       });
       if (blob.size === 0) {
+        shouldRetainStream = false;
+        stopTracks();
         rejectResult(new AudioEnvironmentError("녹음된 음성을 확인할 수 없습니다."));
         return;
       }
 
+      stopTracks();
       resolveResult({
         blob,
         durationMs: Math.min(
@@ -136,6 +193,12 @@ export async function startMicrophoneEnvironmentTest(
 
     return {
       result,
+      retainStream() {
+        if (!settled) {
+          shouldRetainStream = true;
+          retainedMicrophoneStream = stream;
+        }
+      },
       stop() {
         if (!settled && recorder.state === "recording") {
           recorder.stop();
@@ -147,6 +210,7 @@ export async function startMicrophoneEnvironmentTest(
           return;
         }
         settled = true;
+        shouldRetainStream = false;
         clearStopTimer();
         stopTracks();
         if (recorder.state === "recording") {

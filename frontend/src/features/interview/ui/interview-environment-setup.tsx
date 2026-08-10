@@ -11,6 +11,7 @@ import {
 import { getInterviewErrorMessage } from "@/features/interview/model/interview-error";
 import {
   MICROPHONE_TEST_DURATION_MS,
+  releaseRetainedMicrophoneStream,
   startMicrophoneEnvironmentTest,
   type MicrophoneTestSession,
 } from "@/features/interview/model/audio-environment";
@@ -21,7 +22,12 @@ interface InterviewEnvironmentSetupProps {
   api?: InterviewApi;
 }
 
-type MicrophoneTestState = "idle" | "recording" | "recorded" | "passed";
+type MicrophoneTestState =
+  | "idle"
+  | "starting"
+  | "recording"
+  | "recorded"
+  | "passed";
 
 export function InterviewEnvironmentSetup({
   api,
@@ -30,6 +36,8 @@ export function InterviewEnvironmentSetup({
   const { status } = useAuth();
   const apiRef = useRef<InterviewApi | null>(api ?? null);
   const microphoneSessionRef = useRef<MicrophoneTestSession | null>(null);
+  const microphoneRequestRef = useRef(0);
+  const handingOffToInterviewRef = useRef(false);
   const mountedRef = useRef(true);
   const [microphoneState, setMicrophoneState] =
     useState<MicrophoneTestState>("idle");
@@ -60,7 +68,11 @@ export function InterviewEnvironmentSetup({
 
     return () => {
       mountedRef.current = false;
+      microphoneRequestRef.current += 1;
       microphoneSessionRef.current?.cancel();
+      if (!handingOffToInterviewRef.current) {
+        releaseRetainedMicrophoneStream();
+      }
     };
   }, []);
 
@@ -92,8 +104,10 @@ export function InterviewEnvironmentSetup({
   }, [microphoneState, recordingStartedAt]);
 
   async function handleMicrophoneTest() {
+    const requestId = ++microphoneRequestRef.current;
     microphoneSessionRef.current?.cancel();
     microphoneSessionRef.current = null;
+    releaseRetainedMicrophoneStream();
     setError(null);
     setPreviewUrl(null);
     setIsPlaybackReady(false);
@@ -101,23 +115,29 @@ export function InterviewEnvironmentSetup({
     setIsStoppingRecording(false);
     setRecordingStartedAt(null);
     setRecordingDurationMs(0);
-    setMicrophoneState("recording");
+    setMicrophoneState("starting");
 
     try {
       const session = await startMicrophoneEnvironmentTest();
-      if (!mountedRef.current) {
+      if (
+        !mountedRef.current ||
+        microphoneRequestRef.current !== requestId
+      ) {
         session.cancel();
         return;
       }
 
       microphoneSessionRef.current = session;
+      session.retainStream();
       setIsStartingRecording(false);
       setRecordingStartedAt(Date.now());
+      setMicrophoneState("recording");
 
       void session.result.then(
         (result) => {
           if (
             !mountedRef.current ||
+            microphoneRequestRef.current !== requestId ||
             microphoneSessionRef.current !== session
           ) {
             return;
@@ -133,6 +153,7 @@ export function InterviewEnvironmentSetup({
         (cause) => {
           if (
             !mountedRef.current ||
+            microphoneRequestRef.current !== requestId ||
             microphoneSessionRef.current !== session
           ) {
             return;
@@ -146,7 +167,10 @@ export function InterviewEnvironmentSetup({
         },
       );
     } catch (cause) {
-      if (!mountedRef.current) {
+      if (
+        !mountedRef.current ||
+        microphoneRequestRef.current !== requestId
+      ) {
         return;
       }
 
@@ -159,10 +183,23 @@ export function InterviewEnvironmentSetup({
 
   function handleStopMicrophoneTest() {
     const session = microphoneSessionRef.current;
+    if (isStartingRecording) {
+      microphoneRequestRef.current += 1;
+      session?.cancel();
+      microphoneSessionRef.current = null;
+      setIsStartingRecording(false);
+      setRecordingStartedAt(null);
+      setRecordingDurationMs(0);
+      setMicrophoneState("idle");
+      setError("마이크 테스트 시작을 취소했습니다. 다시 시도해 주세요.");
+      return;
+    }
+
     if (!session) {
       return;
     }
 
+    session.retainStream();
     setIsStoppingRecording(true);
     void session.stop().catch(() => undefined);
   }
@@ -198,6 +235,7 @@ export function InterviewEnvironmentSetup({
     try {
       const start = await resolveApi().startOrResume();
       saveInterviewStart(start);
+      handingOffToInterviewRef.current = true;
       router.push(`/interviews/${start.sessionId}`);
     } catch (cause) {
       setError(getInterviewErrorMessage(cause));
@@ -242,6 +280,12 @@ export function InterviewEnvironmentSetup({
         </div>
 
         <div className="mt-8 rounded-2xl bg-slate-50 p-5 text-center">
+          {microphoneState === "starting" ? (
+            <div role="status" className="space-y-4 text-slate-600">
+              <p className="font-semibold">녹음 장치를 준비하고 있습니다.</p>
+            </div>
+          ) : null}
+
           {microphoneState === "recording" ? (
             <div role="status" className="space-y-4 text-slate-700">
               {isStartingRecording ? (
@@ -309,14 +353,18 @@ export function InterviewEnvironmentSetup({
             </div>
           ) : null}
 
-          {microphoneState === "recording" ? (
+          {microphoneState === "starting" || microphoneState === "recording" ? (
             <button
               type="button"
               onClick={handleStopMicrophoneTest}
-              disabled={isStartingRecording || isStoppingRecording}
+              disabled={isStoppingRecording}
               className="h-12 w-full max-w-md rounded-xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isStoppingRecording ? "녹음 종료 중..." : "녹음 끝내기"}
+              {isStartingRecording
+                ? "마이크 테스트 취소"
+                : isStoppingRecording
+                  ? "녹음 종료 중..."
+                  : "녹음 끝내기"}
             </button>
           ) : (
             <button

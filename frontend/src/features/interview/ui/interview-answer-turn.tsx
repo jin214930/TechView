@@ -7,6 +7,7 @@ import {
   type InterviewVoiceApi,
 } from "@/features/interview/api/interview-voice-api";
 import {
+  MAX_AUDIO_DURATION_MS,
   startAudioAnswerRecording,
   type AudioAnswerRecording,
   type AudioAnswerRecordingSession,
@@ -20,7 +21,13 @@ interface InterviewAnswerTurnProps {
   voiceApi?: InterviewVoiceApi;
 }
 
-type AnswerState = "idle" | "recording" | "recorded" | "uploading" | "submitted";
+type AnswerState =
+  | "idle"
+  | "starting"
+  | "recording"
+  | "recorded"
+  | "uploading"
+  | "submitted";
 
 interface PreparedAnswerState {
   answerId: number;
@@ -40,8 +47,14 @@ export function InterviewAnswerTurn({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [preparedAnswer, setPreparedAnswer] = useState<PreparedAnswerState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isStartingRecording, setIsStartingRecording] = useState(false);
+  const [isStoppingRecording, setIsStoppingRecording] = useState(false);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
+  const [recordingDurationMs, setRecordingDurationMs] = useState(0);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     return () => {
       mountedRef.current = false;
       recordingRequestRef.current += 1;
@@ -52,12 +65,68 @@ export function InterviewAnswerTurn({
     };
   }, []);
 
+  useEffect(() => {
+    if (answerState !== "recording" || recordingStartedAt === null) {
+      return;
+    }
+
+    const updateDuration = () => {
+      setRecordingDurationMs(
+        Math.min(MAX_AUDIO_DURATION_MS, Math.max(0, Date.now() - recordingStartedAt)),
+      );
+    };
+
+    updateDuration();
+    const timer = window.setInterval(updateDuration, 1000);
+    return () => window.clearInterval(timer);
+  }, [answerState, recordingStartedAt]);
+
   function replacePreviewUrl(nextUrl: string | null) {
     if (previewUrlRef.current && previewUrlRef.current !== nextUrl) {
       URL.revokeObjectURL(previewUrlRef.current);
     }
     previewUrlRef.current = nextUrl;
     setPreviewUrl(nextUrl);
+  }
+
+  function handleRecordingResult(
+    recorder: AudioAnswerRecordingSession,
+    requestId: number,
+  ) {
+    void recorder.result
+      .then((result) => {
+        if (
+          !mountedRef.current ||
+          recordingRequestRef.current !== requestId ||
+          recorderRef.current !== recorder
+        ) {
+          return;
+        }
+        setRecording(result);
+        replacePreviewUrl(URL.createObjectURL(result.blob));
+        setRecordingStartedAt(null);
+        setRecordingDurationMs(result.durationMs);
+        setIsStartingRecording(false);
+        setIsStoppingRecording(false);
+        setAnswerState("recorded");
+        recorderRef.current = null;
+      })
+      .catch((cause) => {
+        if (
+          !mountedRef.current ||
+          recordingRequestRef.current !== requestId ||
+          recorderRef.current !== recorder
+        ) {
+          return;
+        }
+        recorderRef.current = null;
+        setRecordingStartedAt(null);
+        setRecordingDurationMs(0);
+        setIsStartingRecording(false);
+        setIsStoppingRecording(false);
+        setAnswerState("idle");
+        setError(getInterviewErrorMessage(cause));
+      });
   }
 
   async function handleStartRecording() {
@@ -72,7 +141,11 @@ export function InterviewAnswerTurn({
     setError(null);
     setRecording(null);
     replacePreviewUrl(null);
-    setAnswerState("recording");
+    setIsStartingRecording(true);
+    setIsStoppingRecording(false);
+    setRecordingStartedAt(null);
+    setRecordingDurationMs(0);
+    setAnswerState("starting");
 
     try {
       const recorder = await startAudioAnswerRecording();
@@ -81,11 +154,18 @@ export function InterviewAnswerTurn({
         return;
       }
       recorderRef.current = recorder;
+      setIsStartingRecording(false);
+      setRecordingStartedAt(Date.now());
+      setAnswerState("recording");
+      handleRecordingResult(recorder, requestId);
     } catch (cause) {
       if (!mountedRef.current || recordingRequestRef.current !== requestId) {
         return;
       }
       recorderRef.current = null;
+      setIsStartingRecording(false);
+      setRecordingStartedAt(null);
+      setRecordingDurationMs(0);
       setAnswerState("idle");
       setError(getInterviewErrorMessage(cause));
     }
@@ -93,28 +173,31 @@ export function InterviewAnswerTurn({
 
   async function handleStopRecording() {
     const recorder = recorderRef.current;
+    if (isStoppingRecording) {
+      return;
+    }
+
+    if (isStartingRecording) {
+      recordingRequestRef.current += 1;
+      recorder?.cancel();
+      recorderRef.current = null;
+      setIsStartingRecording(false);
+      setRecordingStartedAt(null);
+      setRecordingDurationMs(0);
+      setAnswerState("idle");
+      setError("녹음 시작을 취소했습니다. 다시 녹음해 주세요.");
+      return;
+    }
+
     if (!recorder) {
       return;
     }
 
+    setIsStoppingRecording(true);
     try {
-      const result = await recorder.stop();
-      if (!mountedRef.current) {
-        return;
-      }
-      setRecording(result);
-      replacePreviewUrl(URL.createObjectURL(result.blob));
-      setAnswerState("recorded");
-    } catch (cause) {
-      if (!mountedRef.current) {
-        return;
-      }
-      setAnswerState("idle");
-      setError(getInterviewErrorMessage(cause));
-    } finally {
-      if (recorderRef.current === recorder) {
-        recorderRef.current = null;
-      }
+      await recorder.stop();
+    } catch {
+      // The session result handler updates the UI with the user-facing error.
     }
   }
 
@@ -220,6 +303,23 @@ export function InterviewAnswerTurn({
         </div>
       ) : null}
 
+      {answerState === "starting" ? (
+        <div className="mt-6 text-sm text-slate-600" aria-live="polite">
+          녹음 장치를 준비하고 있습니다.
+        </div>
+      ) : null}
+
+      {answerState === "recording" ? (
+        <div className="mt-6 space-y-3 text-slate-600" aria-live="polite">
+          <p className="text-sm">
+            녹음 시간{" "}
+            <span className="font-mono tabular-nums text-slate-900">
+              {formatRecordingDuration(recordingDurationMs)}
+            </span>
+          </p>
+        </div>
+      ) : null}
+
       {error ? (
         <p role="alert" className="mt-5 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
@@ -227,13 +327,18 @@ export function InterviewAnswerTurn({
       ) : null}
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-        {answerState === "recording" ? (
+        {answerState === "starting" || answerState === "recording" ? (
           <button
             type="button"
             onClick={() => void handleStopRecording()}
-            className="h-12 flex-1 rounded-xl bg-rose-600 text-sm font-bold text-white transition hover:bg-rose-700"
+            disabled={isStoppingRecording}
+            className="h-12 flex-1 rounded-xl bg-rose-600 text-sm font-bold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            녹음 끝내기
+            {isStartingRecording
+              ? "녹음 시작 취소"
+              : isStoppingRecording
+                ? "녹음 저장 중..."
+                : "녹음 끝내기"}
           </button>
         ) : (
           <button
@@ -256,4 +361,12 @@ export function InterviewAnswerTurn({
       </div>
     </>
   );
+}
+
+function formatRecordingDuration(durationMs: number) {
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
