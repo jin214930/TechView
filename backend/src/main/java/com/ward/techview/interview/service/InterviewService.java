@@ -5,10 +5,12 @@ import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.dto.ActiveInterviewResponse;
 import com.ward.techview.interview.dto.InterviewStartResponse;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
+import com.ward.techview.interview.entity.InterviewDailyUsage;
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.entity.InterviewStatus;
 import com.ward.techview.interview.entity.InterviewTurn;
 import com.ward.techview.interview.repository.InterviewCoreQuestionRepository;
+import com.ward.techview.interview.repository.InterviewDailyUsageRepository;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
 import com.ward.techview.interview.response.InterviewResponseCode;
@@ -18,8 +20,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -27,17 +31,20 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class InterviewService {
     private static final int CORE_QUESTION_COUNT = 5;
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final InterviewSessionRepository interviewSessionRepository;
+    private final InterviewDailyUsageRepository interviewDailyUsageRepository;
     private final InterviewCoreQuestionRepository interviewCoreQuestionRepository;
     private final InterviewTurnRepository interviewTurnRepository;
     private final MemberLockManager memberLockManager;
     private final QuestionSelector questionSelector;
     private final InterviewRetentionPolicy retentionPolicy;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public ActiveInterviewResponse getActiveSession(Long memberId) {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = OffsetDateTime.now(clock);
         OffsetDateTime cutoff = retentionPolicy.calculateCutoff(now);
 
         return interviewSessionRepository.findActiveSession(memberId, InterviewStatus.IN_PROGRESS, cutoff)
@@ -49,12 +56,25 @@ public class InterviewService {
     public InterviewStartResponse startOrResume(Long memberId) {
         memberLockManager.lock(memberId);
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = OffsetDateTime.now(clock);
         OffsetDateTime cutoff = retentionPolicy.calculateCutoff(now);
 
         return interviewSessionRepository.findActiveSession(memberId, InterviewStatus.IN_PROGRESS, cutoff)
                 .map(this::resume)
-                .orElseGet(() -> create(memberId, now));
+                .orElseGet(() -> {
+                    consumeDailyUsage(memberId, now);
+                    return create(memberId, now);
+                });
+    }
+
+    private void consumeDailyUsage(Long memberId, OffsetDateTime now) {
+        LocalDate usageDate = now.atZoneSameInstant(BUSINESS_ZONE).toLocalDate();
+
+        if (interviewDailyUsageRepository.existsByMemberIdAndUsageDate(memberId, usageDate)) {
+            throw new BusinessException(InterviewResponseCode.DAILY_INTERVIEW_LIMIT_EXCEEDED);
+        }
+
+        interviewDailyUsageRepository.save(InterviewDailyUsage.create(memberId, usageDate));
     }
 
     private InterviewStartResponse resume(InterviewSession session) {

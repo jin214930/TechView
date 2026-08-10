@@ -33,6 +33,7 @@ public class InterviewController {
     }
 
     @PostMapping
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "429", description = "일일 면접 횟수 제한 초과")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "진행 중인 면접 재개"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "새 면접 시작")
