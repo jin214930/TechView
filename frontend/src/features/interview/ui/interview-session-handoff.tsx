@@ -415,6 +415,37 @@ function CompletedFeedbackState({
   error: string | null;
   onRetry(): void;
 }) {
+  return (
+    <div>
+      <CompletedFeedbackBody
+        feedback={feedback}
+        isLoading={isLoading}
+        error={error}
+        onRetry={onRetry}
+      />
+      <div className="mt-8 border-t border-slate-200 pt-6 text-center">
+        <Link
+          href="/"
+          className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-950 px-6 text-sm font-bold text-white transition hover:bg-slate-800"
+        >
+          면접 종료
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function CompletedFeedbackBody({
+  feedback,
+  isLoading,
+  error,
+  onRetry,
+}: {
+  feedback: InterviewFeedback | null;
+  isLoading: boolean;
+  error: string | null;
+  onRetry(): void;
+}) {
   if (isLoading || (!feedback && !error)) {
     return <FeedbackProcessingState />;
   }

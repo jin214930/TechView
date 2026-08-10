@@ -294,9 +294,13 @@ describe("InterviewSessionHandoff", () => {
         name: "면접 피드백을 생성 중입니다.",
       }),
     ).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "면접 종료" }).getAttribute("href"),
+    ).toBe("/");
     onEvent({ name: "feedback-status-changed", sessionId: 10 });
 
     expect(await screen.findByText("완료된 종합 피드백")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "면접 종료" })).toBeTruthy();
     expect(feedbackApi.getFeedback).toHaveBeenCalledTimes(2);
   });
 
@@ -358,6 +362,9 @@ describe("InterviewSessionHandoff", () => {
     expect(
       screen.getByRole("link", { name: "내 면접으로 이동" }).getAttribute("href"),
     ).toBe("/interviews/history");
+    expect(
+      screen.getByRole("link", { name: "면접 종료" }).getAttribute("href"),
+    ).toBe("/");
   });
 
   it("serializes overlapping progress refreshes and replays the latest event", async () => {
