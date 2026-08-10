@@ -18,7 +18,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -27,6 +30,7 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class InterviewService {
     private static final int CORE_QUESTION_COUNT = 5;
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewCoreQuestionRepository interviewCoreQuestionRepository;
@@ -34,10 +38,11 @@ public class InterviewService {
     private final MemberLockManager memberLockManager;
     private final QuestionSelector questionSelector;
     private final InterviewRetentionPolicy retentionPolicy;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public ActiveInterviewResponse getActiveSession(Long memberId) {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = OffsetDateTime.now(clock);
         OffsetDateTime cutoff = retentionPolicy.calculateCutoff(now);
 
         return interviewSessionRepository.findActiveSession(memberId, InterviewStatus.IN_PROGRESS, cutoff)
@@ -49,12 +54,33 @@ public class InterviewService {
     public InterviewStartResponse startOrResume(Long memberId) {
         memberLockManager.lock(memberId);
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = OffsetDateTime.now(clock);
         OffsetDateTime cutoff = retentionPolicy.calculateCutoff(now);
 
         return interviewSessionRepository.findActiveSession(memberId, InterviewStatus.IN_PROGRESS, cutoff)
                 .map(this::resume)
-                .orElseGet(() -> create(memberId, now));
+                .orElseGet(() -> {
+                    validateDailyLimit(memberId, now);
+                    return create(memberId, now);
+                });
+    }
+
+    private void validateDailyLimit(Long memberId, OffsetDateTime now) {
+        LocalDate today = now.atZoneSameInstant(BUSINESS_ZONE).toLocalDate();
+        OffsetDateTime startOfDay = today.atStartOfDay(BUSINESS_ZONE)
+                .toOffsetDateTime()
+                .withOffsetSameInstant(ZoneOffset.UTC);
+        OffsetDateTime startOfNextDay = today.plusDays(1).atStartOfDay(BUSINESS_ZONE)
+                .toOffsetDateTime()
+                .withOffsetSameInstant(ZoneOffset.UTC);
+
+        if (interviewSessionRepository.existsByMemberIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                memberId,
+                startOfDay,
+                startOfNextDay
+        )) {
+            throw new BusinessException(InterviewResponseCode.DAILY_INTERVIEW_LIMIT_EXCEEDED);
+        }
     }
 
     private InterviewStartResponse resume(InterviewSession session) {

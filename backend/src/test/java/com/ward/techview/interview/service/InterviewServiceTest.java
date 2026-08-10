@@ -27,6 +27,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +54,7 @@ class InterviewServiceTest {
     private static final Long MEMBER_ID = 1L;
     private static final Long SESSION_ID = 10L;
     private static final Long TURN_ID = 100L;
+    private static final Instant FIXED_NOW = Instant.parse("2026-08-10T03:00:00Z");
 
     @Mock
     private InterviewSessionRepository interviewSessionRepository;
@@ -71,11 +74,16 @@ class InterviewServiceTest {
     @Mock
     private InterviewRetentionPolicy retentionPolicy;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private InterviewService interviewService;
 
     @BeforeEach
     void setUpRetentionPolicy() {
+        when(clock.instant()).thenReturn(FIXED_NOW);
+        when(clock.getZone()).thenReturn(ZoneOffset.UTC);
         when(retentionPolicy.calculateCutoff(any(OffsetDateTime.class)))
                 .thenAnswer(invocation -> invocation
                         .<OffsetDateTime>getArgument(0)
@@ -249,6 +257,35 @@ class InterviewServiceTest {
         verify(interviewTurnRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("?ㅼ씪 硫댁젒???덉쑝硫??덈줈???몄뀡???앹꽦?섏? ?딅뒗??")
+    void shouldRejectNewSessionWhenMemberAlreadyStartedInterviewToday() {
+        when(interviewSessionRepository.findActiveSession(
+                eq(MEMBER_ID),
+                eq(InterviewStatus.IN_PROGRESS),
+                any(OffsetDateTime.class)
+        )).thenReturn(Optional.empty());
+        when(interviewSessionRepository.existsByMemberIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                eq(MEMBER_ID),
+                any(OffsetDateTime.class),
+                any(OffsetDateTime.class)
+        )).thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> interviewService.startOrResume(MEMBER_ID)
+        );
+
+        assertSame(InterviewResponseCode.DAILY_INTERVIEW_LIMIT_EXCEEDED, exception.getResponseCode());
+        verify(questionSelector, never()).selectCoreQuestions();
+        verify(interviewSessionRepository, never()).save(any());
+        verify(interviewSessionRepository).existsByMemberIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                MEMBER_ID,
+                OffsetDateTime.parse("2026-08-09T15:00:00Z"),
+                OffsetDateTime.parse("2026-08-10T15:00:00Z")
+        );
+    }
+
     private void verifyThirtyDayCutoff() {
         ArgumentCaptor<OffsetDateTime> cutoffCaptor = ArgumentCaptor.forClass(OffsetDateTime.class);
         verify(interviewSessionRepository).findActiveSession(
@@ -257,7 +294,7 @@ class InterviewServiceTest {
                 cutoffCaptor.capture()
         );
 
-        OffsetDateTime expected = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
+        OffsetDateTime expected = OffsetDateTime.ofInstant(FIXED_NOW, ZoneOffset.UTC).minusDays(30);
         long differenceSeconds = Math.abs(
                 expected.toEpochSecond() - cutoffCaptor.getValue().toEpochSecond()
         );

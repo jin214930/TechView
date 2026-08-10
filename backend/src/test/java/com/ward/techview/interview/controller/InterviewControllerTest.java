@@ -213,6 +213,17 @@ class InterviewControllerTest {
         emitter.complete();
     }
 
+    @Test
+    @DisplayName("returns 429 when daily interview limit is exceeded")
+    void shouldReturnTooManyRequestsWhenDailyInterviewLimitIsExceeded() throws Exception {
+        when(interviewService.startOrResume(MEMBER_ID))
+                .thenThrow(new BusinessException(InterviewResponseCode.DAILY_INTERVIEW_LIMIT_EXCEEDED));
+
+        mockMvc.perform(post("/api/v1/interviews"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value(3008));
+    }
+
     private static InterviewStartResponse startResponse(boolean resumed) {
         return new InterviewStartResponse(
                 resumed,
