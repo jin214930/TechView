@@ -9,6 +9,7 @@ import type {
   InterviewEvent,
   InterviewEventsApi,
 } from "@/features/interview/api/interview-events-api";
+import type { InterviewFeedbackApi } from "@/features/interview/api/interview-feedback-api";
 import type { InterviewProgress } from "@/features/interview/model/interview-types";
 import { InterviewSessionHandoff } from "@/features/interview/ui/interview-session-handoff";
 import { ApiClientError } from "@/shared/api/response";
@@ -73,6 +74,7 @@ function renderHandoff(
   api: InterviewApi,
   authApi: AuthApi = createAuthApi(),
   eventsApi?: InterviewEventsApi,
+  feedbackApi?: InterviewFeedbackApi,
 ) {
   return render(
     <AuthProviderCore api={authApi}>
@@ -80,9 +82,25 @@ function renderHandoff(
         sessionId="10"
         api={api}
         eventsApi={eventsApi}
+        feedbackApi={feedbackApi}
       />
     </AuthProviderCore>,
   );
+}
+
+function createFeedbackApi(
+  overrides: Partial<InterviewFeedbackApi> = {},
+): InterviewFeedbackApi {
+  return {
+    getHistory: vi.fn(),
+    getFeedback: vi.fn().mockResolvedValue({
+      sessionId: 10,
+      status: "PROCESSING",
+      feedback: null,
+      errorMessage: null,
+    }),
+    ...overrides,
+  };
 }
 
 describe("InterviewSessionHandoff", () => {
@@ -218,6 +236,128 @@ describe("InterviewSessionHandoff", () => {
 
     cleanup();
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("shows generated feedback after the feedback status event", async () => {
+    let onEvent!: (event: InterviewEvent) => void;
+    const eventsApi: InterviewEventsApi = {
+      subscribe: vi.fn((_sessionId, handlers) => {
+        onEvent = handlers.onEvent;
+        return { close: vi.fn() };
+      }),
+    };
+    const api = createInterviewApi({
+      getProgress: vi.fn().mockResolvedValue({
+        sessionId: 10,
+        status: "COMPLETED",
+        turnId: null,
+        turnOrder: null,
+        turnType: null,
+        question: null,
+        errorCode: null,
+        errorMessage: null,
+      }),
+    });
+    const feedbackApi = createFeedbackApi({
+      getFeedback: vi
+        .fn()
+        .mockResolvedValueOnce({
+          sessionId: 10,
+          status: "PROCESSING",
+          feedback: null,
+          errorMessage: null,
+        })
+        .mockResolvedValueOnce({
+          sessionId: 10,
+          status: "COMPLETED",
+          feedback: {
+            overallSummary: "완료된 종합 피드백",
+            strengths: ["강점"],
+            improvements: ["개선점"],
+            categoryFeedbacks: [
+              {
+                category: "자료구조",
+                assessment: "평가",
+                recommendation: "추천",
+              },
+            ],
+            recommendedTopics: ["그래프"],
+          },
+          errorMessage: null,
+        }),
+    });
+
+    renderHandoff(api, createAuthApi(), eventsApi, feedbackApi);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "면접 피드백을 생성 중입니다.",
+      }),
+    ).toBeTruthy();
+    onEvent({ name: "feedback-status-changed", sessionId: 10 });
+
+    expect(await screen.findByText("완료된 종합 피드백")).toBeTruthy();
+    expect(feedbackApi.getFeedback).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes processing feedback when SSE reconnects", async () => {
+    let onEvent!: (event: InterviewEvent) => void;
+    const eventsApi: InterviewEventsApi = {
+      subscribe: vi.fn((_sessionId, handlers) => {
+        onEvent = handlers.onEvent;
+        return { close: vi.fn() };
+      }),
+    };
+    const api = createInterviewApi({
+      getProgress: vi.fn().mockResolvedValue({
+        sessionId: 10,
+        status: "COMPLETED",
+        turnId: null,
+        turnOrder: null,
+        turnType: null,
+        question: null,
+        errorCode: null,
+        errorMessage: null,
+      }),
+    });
+    const feedbackApi = createFeedbackApi();
+
+    renderHandoff(api, createAuthApi(), eventsApi, feedbackApi);
+    await screen.findByText("면접 피드백을 생성 중입니다.");
+
+    onEvent({ name: "connected", sessionId: 10 });
+
+    await waitFor(() => expect(feedbackApi.getFeedback).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows the feedback failure and a link to interview history", async () => {
+    const api = createInterviewApi({
+      getProgress: vi.fn().mockResolvedValue({
+        sessionId: 10,
+        status: "COMPLETED",
+        turnId: null,
+        turnOrder: null,
+        turnType: null,
+        question: null,
+        errorCode: null,
+        errorMessage: null,
+      }),
+    });
+    const feedbackApi = createFeedbackApi({
+      getFeedback: vi.fn().mockResolvedValue({
+        sessionId: 10,
+        status: "FAILED",
+        feedback: null,
+        errorMessage: "피드백 생성에 실패했습니다.",
+      }),
+    });
+
+    renderHandoff(api, createAuthApi(), undefined, feedbackApi);
+
+    expect(await screen.findByText("피드백 생성에 실패했습니다.")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "내 면접으로 이동" }).getAttribute("href"),
+    ).toBe("/interviews/history");
   });
 
   it("serializes overlapping progress refreshes and replays the latest event", async () => {
