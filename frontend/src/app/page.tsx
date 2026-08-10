@@ -33,6 +33,9 @@ export default function Home() {
             {mainButtonText}
           </Link>
         </div>
+        <p className="mt-3 text-sm text-slate-500">
+          무료 모의 면접은 하루 1회 이용할 수 있어요.
+        </p>
       </section>
 
       {/* 핵심 기능 섹션 */}

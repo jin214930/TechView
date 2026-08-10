@@ -37,6 +37,7 @@ describe("Home", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "TechView" }),
     ).toBeTruthy();
+    expect(screen.getByText("무료 모의 면접은 하루 1회 이용할 수 있어요.")).toBeTruthy();
 
     const button = await screen.findByRole("link", { name: "무료로 시작하기" });
     expect(button.getAttribute("href")).toBe("/signup");
