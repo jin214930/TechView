@@ -66,4 +66,12 @@ class OpenApiIntegrationTests {
         mockMvc.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    @DisplayName("인증 없이 애플리케이션 상태를 조회할 수 있다")
+    void exposesHealthWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
 }
