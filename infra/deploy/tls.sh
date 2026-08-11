@@ -8,6 +8,7 @@ readonly CERTBOT_EMAIL="rlawlsaud2149@gmail.com"
 readonly WEBROOT="/var/www/certbot"
 readonly AVAILABLE_CONFIG="/etc/nginx/sites-available/techview-api.conf"
 readonly ENABLED_CONFIG="/etc/nginx/sites-enabled/techview-api.conf"
+readonly CERTBOT_WAIT_TIMEOUT_SECONDS=120
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "[techview] run this script with sudo" >&2
@@ -59,6 +60,20 @@ backup_nginx_config() {
     cp -a -- "$ENABLED_CONFIG" "$BACKUP_DIR/enabled"
     BACKUP_ENABLED=true
   fi
+}
+
+wait_for_certbot_service() {
+  local waited_seconds=0
+
+  while systemctl is-active --quiet certbot.service; do
+    if (( waited_seconds >= CERTBOT_WAIT_TIMEOUT_SECONDS )); then
+      echo "[techview] timed out waiting for the running Certbot service" >&2
+      return 1
+    fi
+
+    sleep 1
+    waited_seconds=$((waited_seconds + 1))
+  done
 }
 
 restore_nginx_config() {
@@ -138,12 +153,22 @@ systemctl is-active --quiet nginx
 ROLLBACK_REQUIRED=false
 trap - ERR
 
-systemctl enable --now certbot.timer
-if ! certbot renew --dry-run; then
+echo "[techview] verifying automatic certificate renewal"
+systemctl stop certbot.timer
+
+if ! wait_for_certbot_service; then
+  systemctl enable --now certbot.timer
+  cleanup_backup
+  exit 1
+fi
+
+if ! certbot renew --dry-run --no-random-sleep-on-renew; then
+  systemctl enable --now certbot.timer
   cleanup_backup
   echo "[techview] certificate renewal dry-run failed" >&2
   exit 1
 fi
 
+systemctl enable --now certbot.timer
 cleanup_backup
 echo "[techview] domain and TLS setup completed"
