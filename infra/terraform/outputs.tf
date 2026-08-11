@@ -33,6 +33,16 @@ output "audio_bucket_name" {
   value       = oci_objectstorage_bucket.audio.name
 }
 
+output "audio_s3_compatibility_endpoint" {
+  description = "운영 환경 AUDIO_STORAGE_ENDPOINT에 넣을 OCI S3 호환 엔드포인트"
+  value       = "https://${var.object_storage_namespace}.compat.objectstorage.${var.region}.oci.customer-oci.com"
+}
+
+output "storage_service_user_id" {
+  description = "Customer Secret Key를 수동 발급할 Object Storage 전용 사용자 OCID"
+  value       = oci_identity_user.storage_service.id
+}
+
 output "region" {
   description = "배포 리전"
   value       = var.region

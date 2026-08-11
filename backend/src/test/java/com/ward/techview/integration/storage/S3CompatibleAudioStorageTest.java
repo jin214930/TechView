@@ -121,6 +121,63 @@ class S3CompatibleAudioStorageTest {
     }
 
     @Test
+    @DisplayName("OCI path-style Presigned URL에 버킷과 객체 경로를 포함한다")
+    void shouldIssueOciPathStylePresignedPutUrl() {
+        URI ociEndpoint = URI.create(
+                "https://namespace.compat.objectstorage.ap-chuncheon-1.oci.customer-oci.com"
+        );
+
+        try (S3Presigner ociPresigner = S3Presigner.builder()
+                .region(Region.of("ap-chuncheon-1"))
+                .endpointOverride(ociEndpoint)
+                .credentialsProvider(
+                        StaticCredentialsProvider.create(
+                                AwsBasicCredentials.create(
+                                        "test-access-key",
+                                        "test-secret-key"
+                                )
+                        )
+                )
+                .serviceConfiguration(
+                        S3Configuration.builder()
+                                .pathStyleAccessEnabled(true)
+                                .build()
+                )
+                .build()) {
+            AudioStorageProperties ociProperties = new AudioStorageProperties(
+                    "techview-audio",
+                    "ap-chuncheon-1",
+                    ociEndpoint,
+                    "test-access-key",
+                    "test-secret-key",
+                    EXPIRATION,
+                    true
+            );
+            S3CompatibleAudioStorage ociStorage = new S3CompatibleAudioStorage(
+                    ociPresigner,
+                    s3Client,
+                    ociProperties
+            );
+
+            URI uploadUrl = ociStorage.issueUploadUrl(
+                    "interviews/10/turns/100/audio-key",
+                    "audio/webm"
+            ).uploadUrl();
+
+            assertAll(
+                    () -> assertEquals(
+                            "namespace.compat.objectstorage.ap-chuncheon-1.oci.customer-oci.com",
+                            uploadUrl.getHost()
+                    ),
+                    () -> assertEquals(
+                            "/techview-audio/interviews/10/turns/100/audio-key",
+                            uploadUrl.getPath()
+                    )
+            );
+        }
+    }
+
+    @Test
     @DisplayName("저장된 음성 객체의 메타데이터를 조회한다")
     void shouldFindAudioObjectMetadata() {
         HeadObjectResponse headObjectResponse = HeadObjectResponse.builder()

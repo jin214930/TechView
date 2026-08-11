@@ -13,9 +13,9 @@ import java.time.Duration;
 public record AudioStorageProperties(
         @NotBlank String bucket,
         @NotBlank String region,
-        URI endpoint,
-        String accessKey,
-        String secretKey,
+        @NotNull URI endpoint,
+        @NotBlank String accessKey,
+        @NotBlank String secretKey,
         @NotNull Duration presignedUrlExpiration,
         boolean pathStyleAccessEnabled
 ) {
