@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-# Gradle과 JDK가 포함된 빌드 전용 단계다. 최종 이미지에는 빌드 도구가 포함되지 않는다.
-FROM eclipse-temurin:21-jdk-jammy AS builder
+# Gradle 빌드는 runner의 native architecture에서 수행해 ARM64 QEMU 빌드 시간을 줄인다.
+# Java 실행 파일은 architecture에 독립적이며 최종 runtime stage만 대상 architecture로 생성된다.
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-jammy AS builder
 
 WORKDIR /workspace
 
