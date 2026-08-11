@@ -4,6 +4,9 @@
 # Local editor settings
 .vscode/
 
+# Root-level Gradle cache used by local verification commands
+/.gradle-local/
+
 # Terraform local state, provider cache, and variable values
 infra/terraform/.terraform/
 infra/terraform/terraform.tfstate
