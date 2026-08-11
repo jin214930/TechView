@@ -16,9 +16,35 @@ apt-get install -y --no-install-recommends \
   docker-compose-v2 \
   docker.io \
   fail2ban \
+  iptables-persistent \
   jq \
   nginx \
   python3-certbot-nginx
+
+echo "[techview] allowing public HTTP and HTTPS traffic"
+IPTABLES_RULES_V4="/etc/iptables/rules.v4"
+
+if ! grep -q '^-A INPUT -j REJECT' "$IPTABLES_RULES_V4"; then
+  echo "[techview] expected OCI INPUT reject rule was not found" >&2
+  exit 1
+fi
+
+ensure_tcp_input_rule() {
+  local port="$1"
+  local rule="-A INPUT -p tcp -m state --state NEW -m tcp --dport ${port} -j ACCEPT"
+
+  if grep -Fqx -- "$rule" "$IPTABLES_RULES_V4"; then
+    return
+  fi
+
+  sed -i "/^-A INPUT -j REJECT/i ${rule}" "$IPTABLES_RULES_V4"
+}
+
+ensure_tcp_input_rule 80
+ensure_tcp_input_rule 443
+
+/usr/sbin/iptables-restore < "$IPTABLES_RULES_V4"
+systemctl enable --now netfilter-persistent
 
 echo "[techview] enabling Docker"
 systemctl enable --now docker
