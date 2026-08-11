@@ -1,0 +1,146 @@
+# main에 반영된 백엔드 이미지를 GHCR에 게시하고 OCI VM의 단일 컨테이너를 교체한다.
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# 이전 배포를 중간에 취소하면 원격 migration 또는 rollback이 끊길 수 있으므로 직렬로 대기한다.
+concurrency:
+  group: production-backend-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    name: Build and deploy backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate deployment secrets
+        env:
+          OCI_VM_HOST: ${{ secrets.OCI_VM_HOST }}
+          OCI_VM_USER: ${{ secrets.OCI_VM_USER }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          GHCR_PULL_USERNAME: ${{ secrets.GHCR_PULL_USERNAME }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          : "${OCI_VM_HOST:?OCI_VM_HOST secret is required}"
+          : "${OCI_VM_USER:?OCI_VM_USER secret is required}"
+          : "${OCI_SSH_PRIVATE_KEY:?OCI_SSH_PRIVATE_KEY secret is required}"
+          : "${SSH_KNOWN_HOSTS:?SSH_KNOWN_HOSTS secret is required}"
+          : "${GHCR_PULL_USERNAME:?GHCR_PULL_USERNAME secret is required}"
+          : "${GHCR_PULL_TOKEN:?GHCR_PULL_TOKEN secret is required}"
+
+      - name: Resolve lowercase GHCR image name
+        id: image
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          owner="${REPOSITORY_OWNER,,}"
+          echo "name=ghcr.io/${owner}/techview-backend:${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU for ARM64 image build
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR for image push
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ARM64 backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.image.outputs.name }}
+          cache-from: type=gha,scope=backend-production-arm64
+          cache-to: type=gha,mode=max,scope=backend-production-arm64
+
+      - name: Install pinned SSH credentials
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/techview_deploy"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/techview_deploy" "$HOME/.ssh/known_hosts"
+
+      - name: Upload deployment files atomically
+        env:
+          OCI_VM_HOST: ${{ secrets.OCI_VM_HOST }}
+          OCI_VM_USER: ${{ secrets.OCI_VM_USER }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          remote="${OCI_VM_USER}@${OCI_VM_HOST}"
+          stage="/tmp/techview-deploy-${COMMIT_SHA}"
+          ssh_options=(
+            -i "$HOME/.ssh/techview_deploy"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+          )
+
+          ssh "${ssh_options[@]}" "$remote" "install -d -m 700 '$stage'"
+          scp "${ssh_options[@]}" \
+            infra/compose/docker-compose.prod.yml \
+            infra/deploy/deploy.sh \
+            "${remote}:${stage}/"
+          ssh "${ssh_options[@]}" "$remote" \
+            "sudo install -o root -g root -m 0644 '$stage/docker-compose.prod.yml' /opt/techview/deploy/docker-compose.prod.yml && sudo install -o root -g root -m 0755 '$stage/deploy.sh' /opt/techview/deploy/deploy.sh && rm -rf '$stage'"
+
+      - name: Pull private image and deploy on OCI VM
+        env:
+          OCI_VM_HOST: ${{ secrets.OCI_VM_HOST }}
+          OCI_VM_USER: ${{ secrets.OCI_VM_USER }}
+          GHCR_PULL_USERNAME: ${{ secrets.GHCR_PULL_USERNAME }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          BACKEND_IMAGE: ${{ steps.image.outputs.name }}
+        run: |
+          remote="${OCI_VM_USER}@${OCI_VM_HOST}"
+          ssh_options=(
+            -i "$HOME/.ssh/techview_deploy"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+          )
+
+          {
+            printf '%s\n' "$GHCR_PULL_USERNAME"
+            printf '%s\n' "$GHCR_PULL_TOKEN"
+            printf '%s\n' "$BACKEND_IMAGE"
+          } | ssh "${ssh_options[@]}" "$remote" '
+          set -Eeuo pipefail
+
+          IFS= read -r ghcr_username
+          IFS= read -r ghcr_token
+          IFS= read -r backend_image
+
+          cleanup_registry_login() {
+            sudo docker logout ghcr.io >/dev/null 2>&1 || true
+          }
+
+          trap cleanup_registry_login EXIT
+          printf '%s' "$ghcr_token" | sudo docker login ghcr.io --username "$ghcr_username" --password-stdin
+          unset ghcr_token
+
+          sudo /opt/techview/deploy/deploy.sh "$backend_image"
+          '
