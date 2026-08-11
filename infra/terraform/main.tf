@@ -199,6 +199,7 @@ resource "oci_core_instance" "app" {
 
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
+    user_data           = base64encode(file("${path.module}/vm-init.sh"))
   }
 
   freeform_tags = local.common_freeform_tags
