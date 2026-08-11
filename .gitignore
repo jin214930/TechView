@@ -14,3 +14,5 @@ infra/terraform/terraform.tfstate.*
 infra/terraform/*.tfvars
 infra/terraform/*.tfvars.json
 !infra/terraform/terraform.tfvars.example
+
+.vercel
