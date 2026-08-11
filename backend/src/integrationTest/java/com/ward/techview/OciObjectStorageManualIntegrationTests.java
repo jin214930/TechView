@@ -21,6 +21,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -91,11 +92,13 @@ class OciObjectStorageManualIntegrationTests {
     void shouldUploadAndProcessAudioWithOciS3Compatibility() throws Exception {
         PresignedUpload upload = audioStorage.issueUploadUrl(objectKey, CONTENT_TYPE);
 
-        HttpResponse<Void> preflightResponse = sendPreflight(upload.uploadUrl());
+        String requestOrigin = requiredEnvironmentVariable("OCI_STORAGE_ALLOWED_ORIGIN");
+        HttpResponse<Void> preflightResponse = sendPreflight(
+                upload.uploadUrl(),
+                requestOrigin
+        );
         assertSuccessful(preflightResponse.statusCode());
-        assertTrue(preflightResponse.headers()
-                .firstValue("access-control-allow-origin")
-                .isPresent());
+        assertPreflightAllowed(preflightResponse, requestOrigin);
 
         HttpRequest uploadRequest = HttpRequest.newBuilder(upload.uploadUrl())
                 .header("Content-Type", CONTENT_TYPE)
@@ -127,14 +130,54 @@ class OciObjectStorageManualIntegrationTests {
         assertTrue(deleted.isEmpty());
     }
 
-    private HttpResponse<Void> sendPreflight(URI uploadUrl) throws Exception {
+    private HttpResponse<Void> sendPreflight(
+            URI uploadUrl,
+            String requestOrigin
+    ) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(uploadUrl)
-                .header("Origin", requiredEnvironmentVariable("OCI_STORAGE_ALLOWED_ORIGIN"))
+                .header("Origin", requestOrigin)
                 .header("Access-Control-Request-Method", "PUT")
                 .header("Access-Control-Request-Headers", "content-type")
                 .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+    }
+
+    private void assertPreflightAllowed(
+            HttpResponse<Void> response,
+            String requestOrigin
+    ) {
+        String allowedOrigin = response.headers()
+                .firstValue("access-control-allow-origin")
+                .orElseThrow(() -> new AssertionError(
+                        "Access-Control-Allow-Origin 응답 헤더가 없습니다."
+                ));
+        assertTrue(
+                allowedOrigin.equals("*") || allowedOrigin.equals(requestOrigin),
+                () -> "요청 Origin이 허용되지 않았습니다. allowedOrigin=" + allowedOrigin
+        );
+        assertTrue(
+                headerAllows(response, "access-control-allow-methods", "PUT"),
+                "Access-Control-Allow-Methods에 PUT이 없습니다."
+        );
+        assertTrue(
+                headerAllows(response, "access-control-allow-headers", "content-type"),
+                "Access-Control-Allow-Headers에 content-type이 없습니다."
+        );
+    }
+
+    private boolean headerAllows(
+            HttpResponse<Void> response,
+            String headerName,
+            String requiredValue
+    ) {
+        return response.headers()
+                .allValues(headerName)
+                .stream()
+                .flatMap(value -> Arrays.stream(value.split(",")))
+                .map(String::trim)
+                .anyMatch(value -> value.equals("*")
+                        || value.equalsIgnoreCase(requiredValue));
     }
 
     private void assertSuccessful(int statusCode) {
