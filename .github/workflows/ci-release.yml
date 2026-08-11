@@ -11,6 +11,7 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - edited
   workflow_dispatch:
 
 # 같은 PR 또는 브랜치에서 새 실행이 시작되면 오래된 검증을 취소합니다.
@@ -29,11 +30,22 @@ jobs:
     env:
       EVENT_NAME: ${{ github.event_name }}
       HEAD_REF: ${{ github.head_ref }}
+      HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      TARGET_REPOSITORY: ${{ github.repository }}
     steps:
       - name: Allow only dev to main pull requests
         run: |
-          if [[ "$EVENT_NAME" == "pull_request" && "$HEAD_REF" != "dev" ]]; then
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            exit 0
+          fi
+
+          if [[ "$HEAD_REF" != "dev" ]]; then
             echo "Only dev to main pull requests are allowed. head=$HEAD_REF"
+            exit 1
+          fi
+
+          if [[ "$HEAD_REPOSITORY" != "$TARGET_REPOSITORY" ]]; then
+            echo "The dev branch must belong to this repository. head_repository=$HEAD_REPOSITORY"
             exit 1
           fi
 
