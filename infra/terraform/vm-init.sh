@@ -23,6 +23,7 @@ apt-get install -y --no-install-recommends \
 
 echo "[techview] allowing public HTTP and HTTPS traffic"
 IPTABLES_RULES_V4="/etc/iptables/rules.v4"
+DOCKER_SYSTEMD_DROP_IN_DIR="/etc/systemd/system/docker.service.d"
 
 if ! grep -q '^-A INPUT -j REJECT' "$IPTABLES_RULES_V4"; then
   echo "[techview] expected OCI INPUT reject rule was not found" >&2
@@ -43,12 +44,29 @@ ensure_tcp_input_rule() {
 ensure_tcp_input_rule 80
 ensure_tcp_input_rule 443
 
+# Docker가 동적 iptables 체인을 만든 뒤 OCI 기본 방화벽 규칙이 복원되면
+# DOCKER-FORWARD 체인이 사라진다. 방화벽 복원을 Docker의 필수 선행 조건으로 고정한다.
+install -d -m 0755 "$DOCKER_SYSTEMD_DROP_IN_DIR"
+cat > "$DOCKER_SYSTEMD_DROP_IN_DIR/10-netfilter-persistent.conf" <<'EOF'
+[Unit]
+Requires=netfilter-persistent.service
+After=netfilter-persistent.service
+EOF
+
 /usr/sbin/iptables-restore < "$IPTABLES_RULES_V4"
 systemctl enable --now netfilter-persistent
+systemctl daemon-reload
 
 echo "[techview] enabling Docker"
-systemctl enable --now docker
+systemctl enable docker
+# 패키지 설치 중 이미 시작된 Docker를 재시작하여 복원된 방화벽 위에
+# Docker 전용 체인을 다시 생성한다.
+systemctl restart docker
 systemctl enable --now nginx
+
+echo "[techview] verifying Docker bridge networking"
+docker network create techview-init-network-check >/dev/null
+docker network rm techview-init-network-check >/dev/null
 
 if id ubuntu >/dev/null 2>&1; then
   usermod -aG docker ubuntu
