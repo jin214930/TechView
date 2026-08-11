@@ -1,0 +1,19 @@
+# 이 파일은 예시만 제공한다. 실제 값은 terraform.tfvars에 입력하고 커밋하지 않는다.
+
+tenancy_ocid     = "ocid1.tenancy.oc1..example"
+user_ocid        = "ocid1.user.oc1..example"
+fingerprint      = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+private_key_path = "~/.oci/oci_api_key.pem"
+
+region          = "ap-chuncheon-1"
+compartment_ocid = "ocid1.compartment.oc1..example"
+
+# 비워두면 첫 번째 AD와 Ubuntu 24.04 최신 이미지를 자동 선택한다.
+availability_domain = ""
+image_ocid         = null
+
+ssh_public_key = "ssh-ed25519 AAAA... techview"
+
+# OCI 콘솔의 Object Storage namespace 값을 입력한다.
+object_storage_namespace = "your-namespace"
+bucket_name              = "techview-audio"
