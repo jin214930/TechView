@@ -118,6 +118,32 @@ write_release_metadata() {
   mv -f "$metadata_tmp" "$METADATA_FILE"
 }
 
+prune_old_backend_images() {
+  local image
+  local images
+  local repository
+
+  repository="${NEW_IMAGE%:*}"
+
+  if ! images="$(docker image ls \
+    --filter "reference=${repository}:*" \
+    --format '{{.Repository}}:{{.Tag}}')"; then
+    log "WARNING: failed to list old backend images; cleanup will be retried after the next deployment"
+    return 0
+  fi
+
+  while IFS= read -r image; do
+    if [[ -z "$image" || "$image" == "$NEW_IMAGE" || "$image" == "$PREVIOUS_IMAGE" ]]; then
+      continue
+    fi
+
+    log "removing old backend image ${image}"
+    if ! docker image rm "$image"; then
+      log "WARNING: failed to remove ${image}; cleanup will be retried after the next deployment"
+    fi
+  done <<< "$images"
+}
+
 rollback() {
   trap - ERR
   set +e
@@ -195,6 +221,7 @@ compose "$NEW_IMAGE" up --detach --no-deps --force-recreate backend
 wait_for_health
 run_smoke_test
 write_release_metadata
+prune_old_backend_images
 
 DEPLOYMENT_STARTED=false
 trap - ERR
