@@ -1,0 +1,87 @@
+name: techview-prod
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # 호스트 포트를 공개하지 않고 Compose 내부 네트워크에서만 접근한다.
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend
+
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Nginx만 백엔드에 접근하도록 OCI VM의 loopback 주소에만 바인딩한다.
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ACCESS_TOKEN_EXPIRATION_TIME: ${JWT_ACCESS_TOKEN_EXPIRATION_TIME}
+      JWT_REFRESH_TOKEN_EXPIRATION_TIME: ${JWT_REFRESH_TOKEN_EXPIRATION_TIME}
+      REFRESH_TOKEN_HASH_SECRET_KEY: ${REFRESH_TOKEN_HASH_SECRET_KEY}
+      AUDIO_STORAGE_BUCKET: ${AUDIO_STORAGE_BUCKET}
+      AUDIO_STORAGE_REGION: ${AUDIO_STORAGE_REGION}
+      AUDIO_STORAGE_ENDPOINT: ${AUDIO_STORAGE_ENDPOINT}
+      AUDIO_STORAGE_ACCESS_KEY: ${AUDIO_STORAGE_ACCESS_KEY}
+      AUDIO_STORAGE_SECRET_KEY: ${AUDIO_STORAGE_SECRET_KEY}
+      AUDIO_STORAGE_PATH_STYLE_ACCESS_ENABLED: ${AUDIO_STORAGE_PATH_STYLE_ACCESS_ENABLED:-false}
+      AUDIO_PRESIGNED_URL_EXPIRATION: ${AUDIO_PRESIGNED_URL_EXPIRATION:-5m}
+      AUDIO_MAX_FILE_SIZE: ${AUDIO_MAX_FILE_SIZE:-25MB}
+      PROCESSING_JOB_LEASE_DURATION: ${PROCESSING_JOB_LEASE_DURATION:-2m}
+      PROCESSING_WORKER_CONCURRENCY: ${PROCESSING_WORKER_CONCURRENCY:-2}
+      PROCESSING_WORKER_QUEUE_CAPACITY: ${PROCESSING_WORKER_QUEUE_CAPACITY:-20}
+      PROCESSING_WORKER_POLLING_DELAY: ${PROCESSING_WORKER_POLLING_DELAY:-10s}
+      PROCESSING_WORKER_POLLING_BATCH_SIZE: ${PROCESSING_WORKER_POLLING_BATCH_SIZE:-20}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_STT_MODEL: ${OPENAI_STT_MODEL}
+      OPENAI_STT_LANGUAGE: ${OPENAI_STT_LANGUAGE}
+      OPENAI_STT_TIMEOUT: ${OPENAI_STT_TIMEOUT}
+      OPENAI_ANSWER_ANALYSIS_MODEL: ${OPENAI_ANSWER_ANALYSIS_MODEL}
+      OPENAI_ANSWER_ANALYSIS_PROMPT_VERSION: ${OPENAI_ANSWER_ANALYSIS_PROMPT_VERSION}
+      OPENAI_ANSWER_ANALYSIS_MAX_OUTPUT_TOKENS: ${OPENAI_ANSWER_ANALYSIS_MAX_OUTPUT_TOKENS:-1000}
+      OPENAI_ANSWER_ANALYSIS_TIMEOUT: ${OPENAI_ANSWER_ANALYSIS_TIMEOUT:-60s}
+      OPENAI_INTERVIEW_FEEDBACK_MODEL: ${OPENAI_INTERVIEW_FEEDBACK_MODEL}
+      OPENAI_INTERVIEW_FEEDBACK_PROMPT_VERSION: ${OPENAI_INTERVIEW_FEEDBACK_PROMPT_VERSION}
+      OPENAI_INTERVIEW_FEEDBACK_MAX_OUTPUT_TOKENS: ${OPENAI_INTERVIEW_FEEDBACK_MAX_OUTPUT_TOKENS:-2000}
+      OPENAI_INTERVIEW_FEEDBACK_TIMEOUT: ${OPENAI_INTERVIEW_FEEDBACK_TIMEOUT:-90s}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    stop_grace_period: 30s
+    networks:
+      - backend
+
+# 일반 bridge 네트워크는 DB를 호스트에 공개하지 않으면서 백엔드의 OpenAI/OCI 통신을 허용한다.
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    name: techview-postgres-data
