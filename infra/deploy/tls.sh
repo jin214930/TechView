@@ -8,6 +8,7 @@ readonly CERTBOT_EMAIL="rlawlsaud2149@gmail.com"
 readonly WEBROOT="/var/www/certbot"
 readonly AVAILABLE_CONFIG="/etc/nginx/sites-available/techview-api.conf"
 readonly ENABLED_CONFIG="/etc/nginx/sites-enabled/techview-api.conf"
+readonly CERTBOT_DEPLOY_HOOK="/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh"
 readonly CERTBOT_WAIT_TIMEOUT_SECONDS=120
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -44,6 +45,7 @@ readonly BACKUP_DIR="$(mktemp -d /tmp/techview-nginx-backup.XXXXXX)"
 BACKUP_AVAILABLE=false
 BACKUP_ENABLED=false
 ROLLBACK_REQUIRED=true
+CERTBOT_TIMER_STOPPED=false
 
 cleanup_backup() {
   rm -f -- "$BACKUP_DIR/available" "$BACKUP_DIR/enabled"
@@ -74,6 +76,37 @@ wait_for_certbot_service() {
     sleep 1
     waited_seconds=$((waited_seconds + 1))
   done
+}
+
+install_certbot_deploy_hook() {
+  install -d -m 0755 "$(dirname "$CERTBOT_DEPLOY_HOOK")"
+
+  cat > "$CERTBOT_DEPLOY_HOOK" <<'EOF'
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+nginx -t
+systemctl reload nginx
+EOF
+
+  chmod 0755 "$CERTBOT_DEPLOY_HOOK"
+}
+
+restore_certbot_timer() {
+  local exit_code="$?"
+  trap - EXIT INT TERM
+
+  if [[ "$CERTBOT_TIMER_STOPPED" == true ]]; then
+    echo "[techview] restoring the Certbot renewal timer"
+
+    if ! systemctl enable --now certbot.timer; then
+      echo "[techview] failed to restore the Certbot renewal timer" >&2
+      exit 1
+    fi
+  fi
+
+  exit "$exit_code"
 }
 
 restore_nginx_config() {
@@ -149,26 +182,34 @@ nginx -t
 systemctl reload nginx
 systemctl is-active --quiet nginx
 
+# 인증서가 갱신되면 새 인증서를 적용하도록 Nginx 설정을 검증한 뒤 reload한다.
+install_certbot_deploy_hook
+
 # 최종 HTTPS 설정이 활성화된 뒤에는 갱신 검증 실패가 정상 서비스를 되돌리지 않게 한다.
 ROLLBACK_REQUIRED=false
 trap - ERR
 
 echo "[techview] verifying automatic certificate renewal"
+trap restore_certbot_timer EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+CERTBOT_TIMER_STOPPED=true
 systemctl stop certbot.timer
 
 if ! wait_for_certbot_service; then
-  systemctl enable --now certbot.timer
   cleanup_backup
   exit 1
 fi
 
-if ! certbot renew --dry-run --no-random-sleep-on-renew; then
-  systemctl enable --now certbot.timer
+if ! certbot renew --dry-run --no-random-sleep-on-renew --run-deploy-hooks; then
   cleanup_backup
   echo "[techview] certificate renewal dry-run failed" >&2
   exit 1
 fi
 
 systemctl enable --now certbot.timer
+CERTBOT_TIMER_STOPPED=false
+trap - EXIT INT TERM
 cleanup_backup
 echo "[techview] domain and TLS setup completed"
