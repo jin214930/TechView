@@ -1,0 +1,10 @@
+.git
+.gradle
+.gradle-local
+build
+*.log
+.env
+.env.*
+!.env.example
+src/test
+src/integrationTest
