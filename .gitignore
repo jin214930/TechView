@@ -3,3 +3,11 @@
 
 # Local editor settings
 .vscode/
+
+# Terraform local state, provider cache, and variable values
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.*
+infra/terraform/*.tfvars
+infra/terraform/*.tfvars.json
+!infra/terraform/terraform.tfvars.example
