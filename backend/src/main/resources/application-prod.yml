@@ -31,11 +31,11 @@ storage:
   audio:
     bucket: ${AUDIO_STORAGE_BUCKET}
     region: ${AUDIO_STORAGE_REGION}
-    endpoint: ${AUDIO_STORAGE_ENDPOINT:}
-    access-key: ${AUDIO_STORAGE_ACCESS_KEY:}
-    secret-key: ${AUDIO_STORAGE_SECRET_KEY:}
+    endpoint: ${AUDIO_STORAGE_ENDPOINT}
+    access-key: ${AUDIO_STORAGE_ACCESS_KEY}
+    secret-key: ${AUDIO_STORAGE_SECRET_KEY}
     presigned-url-expiration: ${AUDIO_PRESIGNED_URL_EXPIRATION:5m}
-    path-style-access-enabled: ${AUDIO_STORAGE_PATH_STYLE_ACCESS_ENABLED:false}
+    path-style-access-enabled: true
 
 custom:
   cookie:

@@ -112,3 +112,14 @@ variable "bucket_name" {
   type        = string
   default     = "techview-audio"
 }
+
+variable "storage_service_user_email" {
+  description = "Object Storage Customer Secret Key를 소유할 서비스 사용자의 기본 이메일"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = trimspace(var.storage_service_user_email) != ""
+    error_message = "storage_service_user_email은 비어 있을 수 없습니다."
+  }
+}

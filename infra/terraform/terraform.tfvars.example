@@ -17,3 +17,6 @@ ssh_public_key = "ssh-ed25519 AAAA... techview"
 # OCI 콘솔의 Object Storage namespace 값을 입력한다.
 object_storage_namespace = "your-namespace"
 bucket_name              = "techview-audio"
+
+# 기본 Identity Domain에서 사용자 생성 시 요구하는 실제 이메일을 입력한다.
+storage_service_user_email = "your-email@example.com"

@@ -236,6 +236,67 @@ resource "oci_objectstorage_bucket" "audio" {
   storage_tier   = "Standard"
   versioning     = "Disabled"
 
-  # lifecycle 자동 삭제 정책은 운영 보존 기준을 확정하는 별도 이슈에서 추가한다.
+  freeform_tags = local.common_freeform_tags
+}
+
+# 애플리케이션 정리 작업이 누락된 경우에도 임시 음성이 장기 보관되지 않도록 하는 안전망이다.
+# OCI lifecycle은 일 단위로 평가되므로 실제 삭제에는 최대 24시간가량이 더 걸릴 수 있다.
+resource "oci_objectstorage_object_lifecycle_policy" "audio" {
+  namespace = var.object_storage_namespace
+  bucket    = oci_objectstorage_bucket.audio.name
+
+  # 새 환경에서는 Object Storage 서비스 권한이 먼저 생성되도록 실행 순서를 보장한다.
+  depends_on = [oci_identity_policy.storage_service]
+
+  rules {
+    action      = "DELETE"
+    is_enabled  = true
+    name        = "delete-temporary-audio-after-one-day"
+    target      = "objects"
+    time_amount = 1
+    time_unit   = "DAYS"
+  }
+}
+
+# ------------------------------
+# Object Storage 전용 최소 권한 IAM
+# ------------------------------
+
+# 운영 애플리케이션의 Customer Secret Key 소유자다.
+# 실제 키 쌍은 Terraform state에 남기지 않기 위해 OCI 콘솔에서 수동 발급한다.
+resource "oci_identity_user" "storage_service" {
+  compartment_id = var.tenancy_ocid
+  name           = "${local.name_prefix}-storage-service"
+  description    = "TechView backend S3 compatibility credentials owner"
+  email          = var.storage_service_user_email
+
+  freeform_tags = local.common_freeform_tags
+}
+
+resource "oci_identity_group" "storage" {
+  compartment_id = var.tenancy_ocid
+  name           = "${local.name_prefix}-storage"
+  description    = "TechView audio Object Storage access group"
+
+  freeform_tags = local.common_freeform_tags
+}
+
+resource "oci_identity_user_group_membership" "storage_service" {
+  group_id = oci_identity_group.storage.id
+  user_id  = oci_identity_user.storage_service.id
+}
+
+# 버킷 목록 등 compartment 전체 권한은 주지 않고 techview-audio 버킷의 조회와 객체 관리만 허용한다.
+resource "oci_identity_policy" "storage_service" {
+  compartment_id = var.tenancy_ocid
+  name           = "${local.name_prefix}-storage"
+  description    = "Allow the TechView storage service user to use only the audio bucket"
+
+  statements = [
+    "Allow group id ${oci_identity_group.storage.id} to read buckets in compartment id ${var.compartment_ocid} where target.bucket.name = '${var.bucket_name}'",
+    "Allow group id ${oci_identity_group.storage.id} to manage objects in compartment id ${var.compartment_ocid} where target.bucket.name = '${var.bucket_name}'",
+    "Allow service objectstorage-${var.region} to manage object-family in compartment id ${var.compartment_ocid} where target.bucket.name = '${var.bucket_name}'"
+  ]
+
   freeform_tags = local.common_freeform_tags
 }
