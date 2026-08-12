@@ -29,6 +29,7 @@ function createApi(overrides: Partial<AuthApi> = {}): AuthApi {
     signUp: vi.fn(),
     refresh: vi.fn().mockRejectedValue(new Error("no session")),
     getMe: vi.fn().mockResolvedValue(member),
+    deleteMe: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -62,6 +63,9 @@ describe("SiteHeader", () => {
     );
 
     expect(await screen.findByText("테크뷰님")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "프로필" }).getAttribute("href")).toBe(
+      "/profile",
+    );
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
 
     await waitFor(() => expect(api.logout).toHaveBeenCalledOnce());

@@ -107,4 +107,24 @@ describe("authApi", () => {
       nickname: "테크뷰",
     });
   });
+
+  it("deletes the current member", async () => {
+    const fetchMock = vi.fn(async (request: Request) => {
+      expect(request.method).toBe("DELETE");
+      expect(request.url).toBe("http://localhost:8080/api/v1/members/me");
+
+      return Response.json({
+        code: 0,
+        message: "회원 탈퇴가 완료되었습니다.",
+      });
+    });
+    const api = createAuthApi(
+      createTechViewApiClient({
+        baseUrl: "http://localhost:8080",
+        fetch: fetchMock,
+      }),
+    );
+
+    await expect(api.deleteMe()).resolves.toBeUndefined();
+  });
 });

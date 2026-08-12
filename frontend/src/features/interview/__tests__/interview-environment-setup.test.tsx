@@ -50,6 +50,7 @@ function createAuthApi(overrides: Partial<AuthApi> = {}): AuthApi {
     signUp: vi.fn(),
     refresh: vi.fn().mockResolvedValue("access-token"),
     getMe: vi.fn().mockResolvedValue(member),
+    deleteMe: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn(),
     ...overrides,
   };

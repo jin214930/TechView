@@ -14,6 +14,7 @@ export interface AuthApi {
   signUp(request: SignUpRequest): Promise<void>;
   refresh(): Promise<string>;
   getMe(): Promise<AuthMember>;
+  deleteMe(): Promise<void>;
   logout(): Promise<void>;
 }
 
@@ -53,6 +54,11 @@ export function createAuthApi(client: TechViewApiClient): AuthApi {
         email: requireString(data?.email, "email"),
         nickname: requireString(data?.nickname, "nickname"),
       };
+    },
+
+    async deleteMe() {
+      const result = await client.DELETE("/api/v1/members/me");
+      unwrapApiResponse(result);
     },
 
     async logout() {
