@@ -15,6 +15,7 @@ import {
 import {
   clearAccessToken,
   getAccessToken,
+  setAccessToken,
 } from "@/shared/api/access-token";
 
 const member = {
@@ -32,6 +33,7 @@ function createApi(overrides: Partial<AuthApi> = {}): AuthApi {
     signUp: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn().mockRejectedValue(new Error("no session")),
     getMe: vi.fn().mockResolvedValue(member),
+    deleteMe: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -57,6 +59,12 @@ function AuthProbe() {
       </button>
       <button type="button" onClick={() => auth.logout()}>
         logout
+      </button>
+      <button
+        type="button"
+        onClick={() => void auth.deleteAccount().catch(() => undefined)}
+      >
+        delete-account
       </button>
     </div>
   );
@@ -127,5 +135,50 @@ describe("AuthProvider", () => {
     );
     expect(getAccessToken()).toBeUndefined();
     expect(window.sessionStorage.getItem("techview.interview.start")).toBeNull();
+  });
+
+  it("clears authentication state after account deletion", async () => {
+    const api = createApi({
+      refresh: vi.fn().mockResolvedValue("access-token"),
+    });
+    render(
+      <AuthProviderCore api={api}>
+        <AuthProbe />
+      </AuthProviderCore>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("status").textContent).toBe("authenticated"),
+    );
+    setAccessToken("access-token");
+    fireEvent.click(screen.getByRole("button", { name: "delete-account" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("status").textContent).toBe("anonymous"),
+    );
+    expect(api.deleteMe).toHaveBeenCalledOnce();
+    expect(getAccessToken()).toBeUndefined();
+  });
+
+  it("keeps authentication state when account deletion fails", async () => {
+    const api = createApi({
+      refresh: vi.fn().mockResolvedValue("access-token"),
+      deleteMe: vi.fn().mockRejectedValue(new Error("delete failed")),
+    });
+    render(
+      <AuthProviderCore api={api}>
+        <AuthProbe />
+      </AuthProviderCore>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("status").textContent).toBe("authenticated"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "delete-account" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("status").textContent).toBe("authenticated"),
+    );
+    expect(api.deleteMe).toHaveBeenCalledOnce();
   });
 });

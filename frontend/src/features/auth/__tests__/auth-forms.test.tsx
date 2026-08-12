@@ -31,6 +31,7 @@ function createApi(overrides: Partial<AuthApi> = {}): AuthApi {
     signUp: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn().mockRejectedValue(new Error("no session")),
     getMe: vi.fn().mockResolvedValue(member),
+    deleteMe: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };

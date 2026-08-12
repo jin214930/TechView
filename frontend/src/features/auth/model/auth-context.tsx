@@ -35,6 +35,7 @@ interface AuthContextValue {
   member: AuthMember | null;
   login(input: LoginFormInput): Promise<void>;
   signUp(input: Omit<SignUpFormInput, "passwordConfirm">): Promise<void>;
+  deleteAccount(): Promise<void>;
   logout(): Promise<void>;
 }
 
@@ -120,9 +121,17 @@ function AuthProviderState({
     }
   }, [resolveApi]);
 
+  const deleteAccount = useCallback(async () => {
+    await resolveApi().deleteMe();
+    clearAccessToken();
+    clearInterviewStart();
+    setMember(null);
+    setStatus("anonymous");
+  }, [resolveApi]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, member, login, signUp, logout }),
-    [status, member, login, signUp, logout],
+    () => ({ status, member, login, signUp, deleteAccount, logout }),
+    [status, member, login, signUp, deleteAccount, logout],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;
