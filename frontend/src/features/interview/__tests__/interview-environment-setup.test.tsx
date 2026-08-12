@@ -50,6 +50,7 @@ function createAuthApi(overrides: Partial<AuthApi> = {}): AuthApi {
     signUp: vi.fn(),
     refresh: vi.fn().mockResolvedValue("access-token"),
     getMe: vi.fn().mockResolvedValue(member),
+    deleteMe: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn(),
     ...overrides,
   };
@@ -144,6 +145,9 @@ describe("InterviewEnvironmentSetup", () => {
       name: "면접 시작하기",
     });
     expect((startButton as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText("마이크 권한")).toBeNull();
+    expect(screen.queryByText("음성 녹음")).toBeNull();
+    expect(screen.queryByText("음성 재생")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "마이크 테스트 시작" }));
     expect(
