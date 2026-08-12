@@ -70,12 +70,6 @@ export function ProfilePage() {
             <ProfileRow label="이메일" value={member.email} />
           </dl>
 
-          {error ? (
-            <p role="alert" className="mt-6 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </p>
-          ) : null}
-
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Link
               href="/interviews/history"
@@ -111,6 +105,11 @@ export function ProfilePage() {
             <p className="mt-3 text-sm leading-6 text-slate-600">
               계정과 면접 기록이 삭제되며, 삭제한 데이터는 복구할 수 없습니다.
             </p>
+            {error ? (
+              <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {error}
+              </p>
+            ) : null}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
