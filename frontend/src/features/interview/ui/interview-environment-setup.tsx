@@ -273,12 +273,6 @@ export function InterviewEnvironmentSetup({
           </p>
         </div>
 
-        <div className="mt-8 grid gap-3 sm:grid-cols-3">
-          <CheckItem label="마이크 권한" />
-          <CheckItem label="음성 녹음" />
-          <CheckItem label="음성 재생" />
-        </div>
-
         <div className="mt-8 rounded-2xl bg-slate-50 p-5 text-center">
           {microphoneState === "starting" ? (
             <div role="status" className="space-y-4 text-slate-600">
@@ -404,14 +398,6 @@ export function InterviewEnvironmentSetup({
         </div>
       </section>
     </main>
-  );
-}
-
-function CheckItem({ label }: { label: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-700">
-      {label}
-    </div>
   );
 }
 
