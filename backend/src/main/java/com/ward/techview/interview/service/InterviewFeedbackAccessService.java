@@ -1,7 +1,7 @@
 package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
-import com.ward.techview.interview.api.InterviewFeedbackAccessApi;
+import com.ward.techview.interview.api.feedback.InterviewFeedbackAccessApi;
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.entity.InterviewStatus;
 import com.ward.techview.interview.repository.InterviewSessionRepository;

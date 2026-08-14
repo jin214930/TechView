@@ -1,10 +1,10 @@
 package com.ward.techview.voice.service;
 
-import com.ward.techview.interview.api.InterviewAudioReferenceApi;
-import com.ward.techview.voice.api.AudioStorage;
-import com.ward.techview.voice.api.AudioStorageException;
-import com.ward.techview.voice.api.StoredAudioObject;
-import com.ward.techview.voice.api.StoredAudioObjectPage;
+import com.ward.techview.interview.api.audio.InterviewAudioReferenceApi;
+import com.ward.techview.voice.api.storage.AudioStorage;
+import com.ward.techview.voice.api.storage.AudioStorageException;
+import com.ward.techview.voice.api.storage.StoredAudioObject;
+import com.ward.techview.voice.api.storage.StoredAudioObjectPage;
 import com.ward.techview.voice.config.OrphanAudioCleanupProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

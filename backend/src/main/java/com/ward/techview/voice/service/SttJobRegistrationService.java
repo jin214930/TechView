@@ -1,9 +1,9 @@
 package com.ward.techview.voice.service;
 
-import com.ward.techview.interview.api.AnswerInfo;
-import com.ward.techview.interview.api.InterviewAnswerApi;
-import com.ward.techview.processing.api.ProcessingJobQueue;
-import com.ward.techview.processing.api.ProcessingJobReceipt;
+import com.ward.techview.interview.api.answer.AnswerInfo;
+import com.ward.techview.interview.api.answer.InterviewAnswerApi;
+import com.ward.techview.processing.api.job.ProcessingJobQueue;
+import com.ward.techview.processing.api.job.ProcessingJobReceipt;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,9 +1,9 @@
 package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
-import com.ward.techview.interview.api.AnswerAnalysisContext;
-import com.ward.techview.interview.api.InterviewFeedbackContext;
-import com.ward.techview.interview.api.InterviewFeedbackTurnContext;
+import com.ward.techview.interview.api.answer.AnswerAnalysisContext;
+import com.ward.techview.interview.api.feedback.InterviewFeedbackContext;
+import com.ward.techview.interview.api.feedback.InterviewFeedbackTurnContext;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.FollowUpQuestion;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;

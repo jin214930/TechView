@@ -1,6 +1,6 @@
 package com.ward.techview.voice.dto;
 
-import com.ward.techview.processing.api.ProcessingJobReceipt;
+import com.ward.techview.processing.api.job.ProcessingJobReceipt;
 
 public record AnswerUploadCompletionResponse(
         Long answerId,

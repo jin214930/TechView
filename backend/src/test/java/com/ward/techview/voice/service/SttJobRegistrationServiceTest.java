@@ -1,9 +1,9 @@
 package com.ward.techview.voice.service;
 
-import com.ward.techview.interview.api.AnswerInfo;
-import com.ward.techview.interview.api.InterviewAnswerApi;
-import com.ward.techview.processing.api.ProcessingJobQueue;
-import com.ward.techview.processing.api.ProcessingJobReceipt;
+import com.ward.techview.interview.api.answer.AnswerInfo;
+import com.ward.techview.interview.api.answer.InterviewAnswerApi;
+import com.ward.techview.processing.api.job.ProcessingJobQueue;
+import com.ward.techview.processing.api.job.ProcessingJobReceipt;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

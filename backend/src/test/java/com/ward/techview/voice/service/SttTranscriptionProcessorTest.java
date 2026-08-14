@@ -1,15 +1,15 @@
 package com.ward.techview.voice.service;
 
-import com.ward.techview.processing.api.ClaimedSttJob;
-import com.ward.techview.processing.api.SttJobControl;
-import com.ward.techview.voice.api.AudioObject;
-import com.ward.techview.voice.api.AudioStorage;
-import com.ward.techview.voice.api.AudioStorageException;
-import com.ward.techview.voice.api.AudioStorageFailure;
-import com.ward.techview.voice.api.SpeechToTextException;
-import com.ward.techview.voice.api.SpeechToTextFailure;
-import com.ward.techview.voice.api.SpeechToTextProvider;
-import com.ward.techview.voice.api.TranscriptionResult;
+import com.ward.techview.processing.api.stt.ClaimedSttJob;
+import com.ward.techview.processing.api.stt.SttJobControl;
+import com.ward.techview.voice.api.storage.AudioObject;
+import com.ward.techview.voice.api.storage.AudioStorage;
+import com.ward.techview.voice.api.storage.AudioStorageException;
+import com.ward.techview.voice.api.storage.AudioStorageFailure;
+import com.ward.techview.voice.api.stt.SpeechToTextException;
+import com.ward.techview.voice.api.stt.SpeechToTextFailure;
+import com.ward.techview.voice.api.stt.SpeechToTextProvider;
+import com.ward.techview.voice.api.stt.TranscriptionResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

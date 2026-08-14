@@ -1,10 +1,10 @@
 package com.ward.techview.evaluation.service;
 
-import com.ward.techview.evaluation.api.InterviewFeedbackResult;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackResult;
 import com.ward.techview.evaluation.entity.InterviewFeedback;
 import com.ward.techview.evaluation.repository.InterviewFeedbackRepository;
-import com.ward.techview.processing.api.ClaimedFinalFeedbackJob;
-import com.ward.techview.processing.api.FinalFeedbackJobControl;
+import com.ward.techview.processing.api.feedback.ClaimedFinalFeedbackJob;
+import com.ward.techview.processing.api.feedback.FinalFeedbackJobControl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

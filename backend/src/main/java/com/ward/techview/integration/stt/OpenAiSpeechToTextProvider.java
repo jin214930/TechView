@@ -1,10 +1,10 @@
 package com.ward.techview.integration.stt;
 
-import com.ward.techview.voice.api.AudioObject;
-import com.ward.techview.voice.api.SpeechToTextException;
-import com.ward.techview.voice.api.SpeechToTextFailure;
-import com.ward.techview.voice.api.SpeechToTextProvider;
-import com.ward.techview.voice.api.TranscriptionResult;
+import com.ward.techview.voice.api.storage.AudioObject;
+import com.ward.techview.voice.api.stt.SpeechToTextException;
+import com.ward.techview.voice.api.stt.SpeechToTextFailure;
+import com.ward.techview.voice.api.stt.SpeechToTextProvider;
+import com.ward.techview.voice.api.stt.TranscriptionResult;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;

@@ -1,8 +1,8 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
-import com.ward.techview.processing.api.ClaimedSttJob;
-import com.ward.techview.processing.api.SttJobControl;
+import com.ward.techview.processing.api.analysis.AnswerProcessingStatusChangedEvent;
+import com.ward.techview.processing.api.stt.ClaimedSttJob;
+import com.ward.techview.processing.api.stt.SttJobControl;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.ProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;

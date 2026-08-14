@@ -1,6 +1,6 @@
 package com.ward.techview.integration.analysis;
 
-import com.ward.techview.evaluation.api.AnswerAnalysisProvider;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisProvider;
 import com.ward.techview.integration.openai.OpenAiClientProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

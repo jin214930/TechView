@@ -2,7 +2,7 @@ package com.ward.techview.interview.service;
 
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
-import com.ward.techview.processing.api.SessionProcessingCleanupApi;
+import com.ward.techview.processing.api.cleanup.SessionProcessingCleanupApi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

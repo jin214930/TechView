@@ -1,7 +1,7 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.FailedAudioCleanupTarget;
-import com.ward.techview.processing.api.SttAudioCleanupApi;
+import com.ward.techview.processing.api.cleanup.FailedAudioCleanupTarget;
+import com.ward.techview.processing.api.stt.SttAudioCleanupApi;
 import com.ward.techview.processing.repository.SttProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;

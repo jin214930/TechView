@@ -1,8 +1,9 @@
 package com.ward.techview.voice.service;
 
-import com.ward.techview.processing.api.ClaimedSttJob;
-import com.ward.techview.processing.api.SttJobControl;
-import com.ward.techview.voice.api.*;
+import com.ward.techview.processing.api.stt.ClaimedSttJob;
+import com.ward.techview.processing.api.stt.SttJobControl;
+import com.ward.techview.voice.api.storage.*;
+import com.ward.techview.voice.api.stt.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

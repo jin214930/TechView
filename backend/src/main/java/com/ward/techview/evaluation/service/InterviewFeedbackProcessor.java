@@ -1,11 +1,11 @@
 package com.ward.techview.evaluation.service;
 
-import com.ward.techview.evaluation.api.InterviewFeedbackException;
-import com.ward.techview.evaluation.api.InterviewFeedbackPrompt;
-import com.ward.techview.evaluation.api.InterviewFeedbackProvider;
-import com.ward.techview.evaluation.api.InterviewFeedbackResult;
-import com.ward.techview.processing.api.ClaimedFinalFeedbackJob;
-import com.ward.techview.processing.api.FinalFeedbackJobControl;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackException;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackPrompt;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackProvider;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackResult;
+import com.ward.techview.processing.api.feedback.ClaimedFinalFeedbackJob;
+import com.ward.techview.processing.api.feedback.FinalFeedbackJobControl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

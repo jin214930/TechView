@@ -1,6 +1,6 @@
 package com.ward.techview.evaluation.entity;
 
-import com.ward.techview.evaluation.api.CategoryFeedback;
+import com.ward.techview.evaluation.api.feedback.CategoryFeedback;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

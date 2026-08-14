@@ -1,11 +1,11 @@
 package com.ward.techview.evaluation.service;
 
-import com.ward.techview.evaluation.api.CategoryFeedback;
-import com.ward.techview.evaluation.api.InterviewFeedbackResult;
+import com.ward.techview.evaluation.api.feedback.CategoryFeedback;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackResult;
 import com.ward.techview.evaluation.entity.InterviewFeedback;
 import com.ward.techview.evaluation.repository.InterviewFeedbackRepository;
-import com.ward.techview.processing.api.ClaimedFinalFeedbackJob;
-import com.ward.techview.processing.api.FinalFeedbackJobControl;
+import com.ward.techview.processing.api.feedback.ClaimedFinalFeedbackJob;
+import com.ward.techview.processing.api.feedback.FinalFeedbackJobControl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

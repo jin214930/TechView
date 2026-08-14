@@ -1,7 +1,7 @@
 package com.ward.techview.voice.dto;
 
-import com.ward.techview.interview.api.PreparedAnswer;
-import com.ward.techview.voice.api.PresignedUpload;
+import com.ward.techview.interview.api.answer.PreparedAnswer;
+import com.ward.techview.voice.api.storage.PresignedUpload;
 
 import java.net.URI;
 import java.time.OffsetDateTime;

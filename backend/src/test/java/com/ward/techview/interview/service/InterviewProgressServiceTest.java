@@ -1,7 +1,7 @@
 package com.ward.techview.interview.service;
 
-import com.ward.techview.interview.api.InterviewAdvanceCommand;
-import com.ward.techview.interview.api.InterviewAdvanceResult;
+import com.ward.techview.interview.api.progress.InterviewAdvanceCommand;
+import com.ward.techview.interview.api.progress.InterviewAdvanceResult;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.FollowUpQuestion;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;

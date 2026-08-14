@@ -1,10 +1,10 @@
 package com.ward.techview.integration.analysis;
 
-import com.ward.techview.evaluation.api.AnswerAnalysisException;
-import com.ward.techview.evaluation.api.AnswerAnalysisFailure;
-import com.ward.techview.evaluation.api.AnswerAnalysisPrompt;
-import com.ward.techview.evaluation.api.AnswerAnalysisResult;
-import com.ward.techview.evaluation.api.FollowUpDecision;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisException;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisFailure;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisPrompt;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisResult;
+import com.ward.techview.evaluation.api.analysis.FollowUpDecision;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

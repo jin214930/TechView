@@ -1,6 +1,6 @@
 package com.ward.techview.interview.service;
 
-import com.ward.techview.interview.api.InterviewAudioReferenceApi;
+import com.ward.techview.interview.api.audio.InterviewAudioReferenceApi;
 import com.ward.techview.interview.repository.AnswerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

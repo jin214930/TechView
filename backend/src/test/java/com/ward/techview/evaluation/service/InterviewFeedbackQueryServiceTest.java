@@ -1,16 +1,16 @@
 package com.ward.techview.evaluation.service;
 
 import com.ward.techview.common.exception.BusinessException;
-import com.ward.techview.evaluation.api.CategoryFeedback;
+import com.ward.techview.evaluation.api.feedback.CategoryFeedback;
 import com.ward.techview.evaluation.dto.InterviewFeedbackResponse;
 import com.ward.techview.evaluation.dto.InterviewFeedbackStatus;
 import com.ward.techview.evaluation.entity.InterviewFeedback;
 import com.ward.techview.evaluation.repository.InterviewFeedbackRepository;
 import com.ward.techview.evaluation.response.EvaluationResponseCode;
-import com.ward.techview.interview.api.InterviewFeedbackAccessApi;
-import com.ward.techview.processing.api.FinalFeedbackProcessingQuery;
-import com.ward.techview.processing.api.FinalFeedbackProcessingSnapshot;
-import com.ward.techview.processing.api.FinalFeedbackProcessingStatus;
+import com.ward.techview.interview.api.feedback.InterviewFeedbackAccessApi;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingQuery;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingSnapshot;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

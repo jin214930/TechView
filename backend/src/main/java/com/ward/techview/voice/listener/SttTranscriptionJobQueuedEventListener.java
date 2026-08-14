@@ -1,6 +1,6 @@
 package com.ward.techview.voice.listener;
 
-import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
+import com.ward.techview.processing.api.stt.SttTranscriptionJobQueuedEvent;
 import com.ward.techview.voice.service.SttTranscriptionProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,8 +1,8 @@
 package com.ward.techview.question.service;
 
 import com.ward.techview.common.exception.BusinessException;
-import com.ward.techview.question.api.QuestionSelector;
-import com.ward.techview.question.api.SelectedQuestion;
+import com.ward.techview.question.api.selection.QuestionSelector;
+import com.ward.techview.question.api.selection.SelectedQuestion;
 import com.ward.techview.question.dto.QuestionCandidate;
 import com.ward.techview.question.entity.QuestionCategory;
 import com.ward.techview.question.repository.QuestionRepository;

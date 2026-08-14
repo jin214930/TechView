@@ -1,14 +1,14 @@
 package com.ward.techview.evaluation.service;
 
-import com.ward.techview.evaluation.api.AnswerAnalysisException;
-import com.ward.techview.evaluation.api.AnswerAnalysisFailure;
-import com.ward.techview.evaluation.api.AnswerAnalysisProvider;
-import com.ward.techview.evaluation.api.AnswerAnalysisResult;
-import com.ward.techview.evaluation.api.FollowUpDecision;
-import com.ward.techview.interview.api.AnswerAnalysisContext;
-import com.ward.techview.interview.api.InterviewEvaluationContextApi;
-import com.ward.techview.processing.api.AnswerAnalysisJobControl;
-import com.ward.techview.processing.api.ClaimedAnswerAnalysisJob;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisException;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisFailure;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisProvider;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisResult;
+import com.ward.techview.evaluation.api.analysis.FollowUpDecision;
+import com.ward.techview.interview.api.answer.AnswerAnalysisContext;
+import com.ward.techview.interview.api.feedback.InterviewEvaluationContextApi;
+import com.ward.techview.processing.api.analysis.AnswerAnalysisJobControl;
+import com.ward.techview.processing.api.analysis.ClaimedAnswerAnalysisJob;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

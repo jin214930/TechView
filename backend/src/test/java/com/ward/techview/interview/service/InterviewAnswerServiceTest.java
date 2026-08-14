@@ -1,10 +1,10 @@
 package com.ward.techview.interview.service;
 
 import com.ward.techview.common.exception.BusinessException;
-import com.ward.techview.interview.api.AnswerCreateCommand;
-import com.ward.techview.interview.api.AnswerInfo;
-import com.ward.techview.interview.api.AnswerTranscriptionCommand;
-import com.ward.techview.interview.api.PreparedAnswer;
+import com.ward.techview.interview.api.answer.AnswerCreateCommand;
+import com.ward.techview.interview.api.answer.AnswerInfo;
+import com.ward.techview.interview.api.answer.AnswerTranscriptionCommand;
+import com.ward.techview.interview.api.answer.PreparedAnswer;
 import com.ward.techview.interview.entity.Answer;
 import com.ward.techview.interview.entity.InterviewCoreQuestion;
 import com.ward.techview.interview.entity.InterviewSession;

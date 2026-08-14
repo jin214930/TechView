@@ -1,7 +1,7 @@
 package com.ward.techview.evaluation.listener;
 
 import com.ward.techview.evaluation.service.InterviewFeedbackProcessor;
-import com.ward.techview.processing.api.FinalFeedbackJobQueuedEvent;
+import com.ward.techview.processing.api.feedback.FinalFeedbackJobQueuedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
