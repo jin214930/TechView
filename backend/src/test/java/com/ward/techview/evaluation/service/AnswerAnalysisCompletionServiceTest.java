@@ -1,15 +1,15 @@
 package com.ward.techview.evaluation.service;
 
-import com.ward.techview.evaluation.api.AnswerAnalysisResult;
-import com.ward.techview.evaluation.api.FollowUpDecision;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisResult;
+import com.ward.techview.evaluation.api.analysis.FollowUpDecision;
 import com.ward.techview.evaluation.entity.AnswerAnalysis;
 import com.ward.techview.evaluation.repository.AnswerAnalysisRepository;
-import com.ward.techview.interview.api.InterviewAdvanceCommand;
-import com.ward.techview.interview.api.InterviewAdvanceResult;
-import com.ward.techview.interview.api.InterviewProgressApi;
-import com.ward.techview.processing.api.AnswerAnalysisJobControl;
-import com.ward.techview.processing.api.ClaimedAnswerAnalysisJob;
-import com.ward.techview.processing.api.ProcessingJobQueue;
+import com.ward.techview.interview.api.progress.InterviewAdvanceCommand;
+import com.ward.techview.interview.api.progress.InterviewAdvanceResult;
+import com.ward.techview.interview.api.progress.InterviewProgressApi;
+import com.ward.techview.processing.api.analysis.AnswerAnalysisJobControl;
+import com.ward.techview.processing.api.analysis.ClaimedAnswerAnalysisJob;
+import com.ward.techview.processing.api.job.ProcessingJobQueue;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

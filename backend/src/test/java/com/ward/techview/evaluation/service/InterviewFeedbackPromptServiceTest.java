@@ -1,12 +1,12 @@
 package com.ward.techview.evaluation.service;
 
-import com.ward.techview.evaluation.api.FollowUpDecision;
-import com.ward.techview.evaluation.api.InterviewFeedbackPrompt;
+import com.ward.techview.evaluation.api.analysis.FollowUpDecision;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackPrompt;
 import com.ward.techview.evaluation.entity.AnswerAnalysis;
 import com.ward.techview.evaluation.repository.AnswerAnalysisRepository;
-import com.ward.techview.interview.api.InterviewEvaluationContextApi;
-import com.ward.techview.interview.api.InterviewFeedbackContext;
-import com.ward.techview.interview.api.InterviewFeedbackTurnContext;
+import com.ward.techview.interview.api.feedback.InterviewEvaluationContextApi;
+import com.ward.techview.interview.api.feedback.InterviewFeedbackContext;
+import com.ward.techview.interview.api.feedback.InterviewFeedbackTurnContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

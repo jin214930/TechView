@@ -1,9 +1,9 @@
 package com.ward.techview.voice.service;
 
-import com.ward.techview.processing.api.FailedAudioCleanupTarget;
-import com.ward.techview.processing.api.SttAudioCleanupApi;
-import com.ward.techview.voice.api.AudioStorage;
-import com.ward.techview.voice.api.AudioStorageException;
+import com.ward.techview.processing.api.cleanup.FailedAudioCleanupTarget;
+import com.ward.techview.processing.api.stt.SttAudioCleanupApi;
+import com.ward.techview.voice.api.storage.AudioStorage;
+import com.ward.techview.voice.api.storage.AudioStorageException;
 import com.ward.techview.voice.config.FailedAudioCleanupProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

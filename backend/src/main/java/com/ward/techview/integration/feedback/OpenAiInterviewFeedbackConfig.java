@@ -1,6 +1,6 @@
 package com.ward.techview.integration.feedback;
 
-import com.ward.techview.evaluation.api.InterviewFeedbackProvider;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackProvider;
 import com.ward.techview.integration.openai.OpenAiClientProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

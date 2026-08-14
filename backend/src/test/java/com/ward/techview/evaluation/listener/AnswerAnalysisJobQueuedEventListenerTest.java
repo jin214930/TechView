@@ -1,7 +1,7 @@
 package com.ward.techview.evaluation.listener;
 
 import com.ward.techview.evaluation.service.AnswerAnalysisProcessor;
-import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
+import com.ward.techview.processing.api.analysis.AnswerAnalysisJobQueuedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

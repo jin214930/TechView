@@ -2,10 +2,11 @@ package com.ward.techview;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ward.techview.evaluation.api.*;
-import com.ward.techview.voice.api.AudioObject;
-import com.ward.techview.voice.api.SpeechToTextProvider;
-import com.ward.techview.voice.api.TranscriptionResult;
+import com.ward.techview.evaluation.api.analysis.*;
+import com.ward.techview.evaluation.api.feedback.*;
+import com.ward.techview.voice.api.storage.AudioObject;
+import com.ward.techview.voice.api.stt.SpeechToTextProvider;
+import com.ward.techview.voice.api.stt.TranscriptionResult;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

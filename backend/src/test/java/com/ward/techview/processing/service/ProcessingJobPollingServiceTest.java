@@ -1,10 +1,10 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.AnswerAnalysisJobQueuedEvent;
-import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
-import com.ward.techview.processing.api.FinalFeedbackJobQueuedEvent;
-import com.ward.techview.processing.api.FinalFeedbackProcessingStatusChangedEvent;
-import com.ward.techview.processing.api.SttTranscriptionJobQueuedEvent;
+import com.ward.techview.processing.api.analysis.AnswerAnalysisJobQueuedEvent;
+import com.ward.techview.processing.api.analysis.AnswerProcessingStatusChangedEvent;
+import com.ward.techview.processing.api.feedback.FinalFeedbackJobQueuedEvent;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingStatusChangedEvent;
+import com.ward.techview.processing.api.stt.SttTranscriptionJobQueuedEvent;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.AnswerAnalysisProcessingJob;
 import com.ward.techview.processing.entity.FinalFeedbackProcessingJob;

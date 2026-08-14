@@ -1,7 +1,7 @@
 package com.ward.techview.integration.stt;
 
 import com.ward.techview.integration.openai.OpenAiClientProperties;
-import com.ward.techview.voice.api.SpeechToTextProvider;
+import com.ward.techview.voice.api.stt.SpeechToTextProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

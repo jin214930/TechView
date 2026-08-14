@@ -1,6 +1,6 @@
 package com.ward.techview.integration.analysis;
 
-import com.ward.techview.evaluation.api.AnswerAnalysisPrompt;
+import com.ward.techview.evaluation.api.analysis.AnswerAnalysisPrompt;
 
 import java.util.Objects;
 

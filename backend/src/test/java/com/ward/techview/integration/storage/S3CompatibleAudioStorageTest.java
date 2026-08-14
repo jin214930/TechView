@@ -1,11 +1,11 @@
 package com.ward.techview.integration.storage;
 
-import com.ward.techview.voice.api.AudioObject;
-import com.ward.techview.voice.api.AudioObjectMetadata;
-import com.ward.techview.voice.api.AudioStorageException;
-import com.ward.techview.voice.api.AudioStorageFailure;
-import com.ward.techview.voice.api.PresignedUpload;
-import com.ward.techview.voice.api.StoredAudioObjectPage;
+import com.ward.techview.voice.api.storage.AudioObject;
+import com.ward.techview.voice.api.storage.AudioObjectMetadata;
+import com.ward.techview.voice.api.storage.AudioStorageException;
+import com.ward.techview.voice.api.storage.AudioStorageFailure;
+import com.ward.techview.voice.api.storage.PresignedUpload;
+import com.ward.techview.voice.api.storage.StoredAudioObjectPage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

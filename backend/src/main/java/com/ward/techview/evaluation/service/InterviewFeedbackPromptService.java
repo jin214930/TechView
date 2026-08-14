@@ -1,12 +1,12 @@
 package com.ward.techview.evaluation.service;
 
-import com.ward.techview.evaluation.api.InterviewFeedbackPrompt;
-import com.ward.techview.evaluation.api.InterviewFeedbackTurnPrompt;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackPrompt;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackTurnPrompt;
 import com.ward.techview.evaluation.entity.AnswerAnalysis;
 import com.ward.techview.evaluation.repository.AnswerAnalysisRepository;
-import com.ward.techview.interview.api.InterviewEvaluationContextApi;
-import com.ward.techview.interview.api.InterviewFeedbackContext;
-import com.ward.techview.interview.api.InterviewFeedbackTurnContext;
+import com.ward.techview.interview.api.feedback.InterviewEvaluationContextApi;
+import com.ward.techview.interview.api.feedback.InterviewFeedbackContext;
+import com.ward.techview.interview.api.feedback.InterviewFeedbackTurnContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

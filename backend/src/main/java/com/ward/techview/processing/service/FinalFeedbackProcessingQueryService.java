@@ -1,8 +1,8 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.FinalFeedbackProcessingQuery;
-import com.ward.techview.processing.api.FinalFeedbackProcessingSnapshot;
-import com.ward.techview.processing.api.FinalFeedbackProcessingStatus;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingQuery;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingSnapshot;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingStatus;
 import com.ward.techview.processing.entity.FinalFeedbackProcessingJob;
 import com.ward.techview.processing.repository.FinalFeedbackProcessingJobRepository;
 import lombok.RequiredArgsConstructor;

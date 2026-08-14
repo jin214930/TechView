@@ -1,8 +1,8 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.ClaimedFinalFeedbackJob;
-import com.ward.techview.processing.api.FinalFeedbackJobControl;
-import com.ward.techview.processing.api.FinalFeedbackProcessingStatusChangedEvent;
+import com.ward.techview.processing.api.feedback.ClaimedFinalFeedbackJob;
+import com.ward.techview.processing.api.feedback.FinalFeedbackJobControl;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingStatusChangedEvent;
 import com.ward.techview.processing.config.ProcessingWorkerProperties;
 import com.ward.techview.processing.entity.FinalFeedbackProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;

@@ -1,7 +1,7 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.AnswerProcessingSnapshot;
-import com.ward.techview.processing.api.AnswerProcessingStatus;
+import com.ward.techview.processing.api.analysis.AnswerProcessingSnapshot;
+import com.ward.techview.processing.api.analysis.AnswerProcessingStatus;
 import com.ward.techview.processing.entity.AnswerAnalysisProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
 import com.ward.techview.processing.entity.SttProcessingJob;

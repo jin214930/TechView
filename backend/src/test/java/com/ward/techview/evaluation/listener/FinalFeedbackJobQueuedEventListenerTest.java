@@ -1,7 +1,7 @@
 package com.ward.techview.evaluation.listener;
 
 import com.ward.techview.evaluation.service.InterviewFeedbackProcessor;
-import com.ward.techview.processing.api.FinalFeedbackJobQueuedEvent;
+import com.ward.techview.processing.api.feedback.FinalFeedbackJobQueuedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,7 +1,7 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.FinalFeedbackProcessingSnapshot;
-import com.ward.techview.processing.api.FinalFeedbackProcessingStatus;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingSnapshot;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingStatus;
 import com.ward.techview.processing.entity.FinalFeedbackProcessingJob;
 import com.ward.techview.processing.entity.ProcessingJobStatus;
 import com.ward.techview.processing.repository.FinalFeedbackProcessingJobRepository;

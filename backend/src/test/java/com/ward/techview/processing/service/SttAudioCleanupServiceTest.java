@@ -1,6 +1,6 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.FailedAudioCleanupTarget;
+import com.ward.techview.processing.api.cleanup.FailedAudioCleanupTarget;
 import com.ward.techview.processing.entity.SttProcessingJob;
 import com.ward.techview.processing.repository.SttProcessingJobRepository;
 import org.junit.jupiter.api.BeforeEach;

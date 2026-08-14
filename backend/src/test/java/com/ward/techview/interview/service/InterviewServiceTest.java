@@ -1,6 +1,6 @@
 package com.ward.techview.interview.service;
 
-import com.ward.techview.account.api.MemberLockManager;
+import com.ward.techview.account.api.member.MemberLockManager;
 import com.ward.techview.common.exception.BusinessException;
 import com.ward.techview.interview.dto.ActiveInterviewResponse;
 import com.ward.techview.interview.dto.InterviewStartResponse;
@@ -15,8 +15,8 @@ import com.ward.techview.interview.repository.InterviewDailyUsageRepository;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
 import com.ward.techview.interview.repository.InterviewTurnRepository;
 import com.ward.techview.interview.response.InterviewResponseCode;
-import com.ward.techview.question.api.QuestionSelector;
-import com.ward.techview.question.api.SelectedQuestion;
+import com.ward.techview.question.api.selection.QuestionSelector;
+import com.ward.techview.question.api.selection.SelectedQuestion;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

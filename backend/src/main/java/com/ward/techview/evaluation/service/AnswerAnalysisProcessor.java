@@ -1,10 +1,11 @@
 package com.ward.techview.evaluation.service;
 
-import com.ward.techview.evaluation.api.*;
-import com.ward.techview.interview.api.AnswerAnalysisContext;
-import com.ward.techview.interview.api.InterviewEvaluationContextApi;
-import com.ward.techview.processing.api.AnswerAnalysisJobControl;
-import com.ward.techview.processing.api.ClaimedAnswerAnalysisJob;
+import com.ward.techview.evaluation.api.analysis.*;
+import com.ward.techview.evaluation.api.feedback.*;
+import com.ward.techview.interview.api.answer.AnswerAnalysisContext;
+import com.ward.techview.interview.api.feedback.InterviewEvaluationContextApi;
+import com.ward.techview.processing.api.analysis.AnswerAnalysisJobControl;
+import com.ward.techview.processing.api.analysis.ClaimedAnswerAnalysisJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

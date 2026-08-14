@@ -1,15 +1,15 @@
 package com.ward.techview.voice.service;
 
 import com.ward.techview.common.exception.BusinessException;
-import com.ward.techview.interview.api.AnswerCreateCommand;
-import com.ward.techview.interview.api.AnswerInfo;
-import com.ward.techview.interview.api.InterviewAnswerApi;
-import com.ward.techview.interview.api.PreparedAnswer;
-import com.ward.techview.processing.api.ProcessingJobQueue;
-import com.ward.techview.processing.api.ProcessingJobReceipt;
-import com.ward.techview.voice.api.AudioObjectMetadata;
-import com.ward.techview.voice.api.AudioStorage;
-import com.ward.techview.voice.api.PresignedUpload;
+import com.ward.techview.interview.api.answer.AnswerCreateCommand;
+import com.ward.techview.interview.api.answer.AnswerInfo;
+import com.ward.techview.interview.api.answer.InterviewAnswerApi;
+import com.ward.techview.interview.api.answer.PreparedAnswer;
+import com.ward.techview.processing.api.job.ProcessingJobQueue;
+import com.ward.techview.processing.api.job.ProcessingJobReceipt;
+import com.ward.techview.voice.api.storage.AudioObjectMetadata;
+import com.ward.techview.voice.api.storage.AudioStorage;
+import com.ward.techview.voice.api.storage.PresignedUpload;
 import com.ward.techview.voice.config.VoiceUploadProperties;
 import com.ward.techview.voice.domain.AudioObjectKeyGenerator;
 import com.ward.techview.voice.dto.AnswerCreateRequest;

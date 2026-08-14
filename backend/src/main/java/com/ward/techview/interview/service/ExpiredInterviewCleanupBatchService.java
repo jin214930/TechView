@@ -2,7 +2,7 @@ package com.ward.techview.interview.service;
 
 import com.ward.techview.interview.entity.InterviewSession;
 import com.ward.techview.interview.repository.InterviewSessionRepository;
-import com.ward.techview.processing.api.SessionProcessingCleanupApi;
+import com.ward.techview.processing.api.cleanup.SessionProcessingCleanupApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,6 +1,7 @@
 package com.ward.techview.integration.feedback;
 
-import com.ward.techview.evaluation.api.*;
+import com.ward.techview.evaluation.api.analysis.*;
+import com.ward.techview.evaluation.api.feedback.*;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;

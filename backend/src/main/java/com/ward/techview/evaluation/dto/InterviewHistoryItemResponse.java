@@ -1,6 +1,6 @@
 package com.ward.techview.evaluation.dto;
 
-import com.ward.techview.interview.api.CompletedInterviewSummary;
+import com.ward.techview.interview.api.feedback.CompletedInterviewSummary;
 
 import java.time.OffsetDateTime;
 import java.util.Objects;

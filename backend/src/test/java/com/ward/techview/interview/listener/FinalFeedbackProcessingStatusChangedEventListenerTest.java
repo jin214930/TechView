@@ -1,7 +1,7 @@
 package com.ward.techview.interview.listener;
 
 import com.ward.techview.interview.repository.InterviewSseEmitterRepository;
-import com.ward.techview.processing.api.FinalFeedbackProcessingStatusChangedEvent;
+import com.ward.techview.processing.api.feedback.FinalFeedbackProcessingStatusChangedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

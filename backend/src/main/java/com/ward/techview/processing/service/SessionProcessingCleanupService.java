@@ -1,6 +1,6 @@
 package com.ward.techview.processing.service;
 
-import com.ward.techview.processing.api.SessionProcessingCleanupApi;
+import com.ward.techview.processing.api.cleanup.SessionProcessingCleanupApi;
 import com.ward.techview.processing.repository.ProcessingJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -1,6 +1,6 @@
 package com.ward.techview.account.member.service;
 
-import com.ward.techview.account.api.MemberLockManager;
+import com.ward.techview.account.api.member.MemberLockManager;
 import com.ward.techview.account.member.repository.MemberRepository;
 import com.ward.techview.account.member.response.MemberResponseCode;
 import com.ward.techview.common.exception.BusinessException;

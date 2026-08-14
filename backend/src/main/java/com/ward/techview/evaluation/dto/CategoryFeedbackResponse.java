@@ -1,6 +1,6 @@
 package com.ward.techview.evaluation.dto;
 
-import com.ward.techview.evaluation.api.CategoryFeedback;
+import com.ward.techview.evaluation.api.feedback.CategoryFeedback;
 
 public record CategoryFeedbackResponse(
         String category,

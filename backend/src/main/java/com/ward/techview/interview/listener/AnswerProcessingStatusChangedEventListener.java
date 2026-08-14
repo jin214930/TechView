@@ -1,7 +1,7 @@
 package com.ward.techview.interview.listener;
 
 import com.ward.techview.interview.repository.InterviewSseEmitterRepository;
-import com.ward.techview.processing.api.AnswerProcessingStatusChangedEvent;
+import com.ward.techview.processing.api.analysis.AnswerProcessingStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

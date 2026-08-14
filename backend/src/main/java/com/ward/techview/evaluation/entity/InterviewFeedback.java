@@ -1,7 +1,7 @@
 package com.ward.techview.evaluation.entity;
 
 import com.ward.techview.common.entity.BaseEntity;
-import com.ward.techview.evaluation.api.CategoryFeedback;
+import com.ward.techview.evaluation.api.feedback.CategoryFeedback;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import lombok.AccessLevel;

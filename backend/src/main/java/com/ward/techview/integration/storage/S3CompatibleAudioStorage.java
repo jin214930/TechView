@@ -1,6 +1,7 @@
 package com.ward.techview.integration.storage;
 
-import com.ward.techview.voice.api.*;
+import com.ward.techview.voice.api.storage.*;
+import com.ward.techview.voice.api.stt.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.ResponseBytes;

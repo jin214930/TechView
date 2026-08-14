@@ -1,11 +1,11 @@
 package com.ward.techview.integration.feedback;
 
-import com.ward.techview.evaluation.api.CategoryFeedback;
-import com.ward.techview.evaluation.api.InterviewFeedbackException;
-import com.ward.techview.evaluation.api.InterviewFeedbackFailure;
-import com.ward.techview.evaluation.api.InterviewFeedbackPrompt;
-import com.ward.techview.evaluation.api.InterviewFeedbackResult;
-import com.ward.techview.evaluation.api.InterviewFeedbackTurnPrompt;
+import com.ward.techview.evaluation.api.feedback.CategoryFeedback;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackException;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackFailure;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackPrompt;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackResult;
+import com.ward.techview.evaluation.api.feedback.InterviewFeedbackTurnPrompt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
